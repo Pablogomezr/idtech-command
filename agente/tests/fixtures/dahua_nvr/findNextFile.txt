@@ -1,0 +1,5 @@
+found=1
+items[0].Channel=0
+items[0].StartTime=2026-10-03 08:00:00
+items[0].EndTime=2026-10-03 09:00:00
+items[0].Type=dav

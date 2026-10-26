@@ -41,6 +41,9 @@ METRICAS_PERMITIDAS: dict[str, tuple[type, ...]] = {
     "lectoras_desconectadas": (int,),
     "tamper_activo": (bool,),
     "bateria_baja": (bool,),
+    # Almacenamiento de NVR/DVR.
+    "discos_con_error": (int,),
+    "almacenamiento_uso_pct": (int, float),
 }
 
 PATRON_CODIGO = re.compile(r"^[a-z0-9_]{1,64}$")

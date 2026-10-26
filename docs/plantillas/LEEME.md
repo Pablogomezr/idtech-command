@@ -18,5 +18,6 @@ muestra la más específica que coincida (marca + tipo > tipo > genérica).
 Las filas incluidas son ejemplos para mostrar el formato; reemplácelas con su experiencia.
 Códigos que el agente emite hoy: `sin_respuesta_icmp`, `perdida_paquetes`, `sin_respuesta_http`,
 `credencial_rechazada`, `credencial_requerida`, `tamper_activo`, `lectora_desconectada`,
-`bateria_baja`, `reloj_desfasado`,
+`bateria_baja`, `reloj_desfasado`, `disco_con_error`, `sin_disco`, `camara_desconectada_nvr`,
+`sin_grabaciones`, `busqueda_no_soportada`,
 `retencion_insuficiente`, `credencial_no_encontrada`, `tiempo_agotado`, `error_adaptador`.

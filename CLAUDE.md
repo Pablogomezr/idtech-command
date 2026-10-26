@@ -107,12 +107,19 @@ IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "
 |---|---|---|---|
 | `icmp` | Cualquiera con IP | Respuesta, latencia, pérdida | Probado en contenedor |
 | `hikvision_acceso` | Paneles/terminales Hikvision (ISAPI) | Modelo, firmware, serie, reloj, tamper, lectoras, batería | Validar con equipo real |
-| `dahua_acceso` | Controladoras/terminales Dahua (CGI) | Modelo, firmware, serie, reloj | Validar con equipo real |
+| `dahua_acceso` / `dahua_camara` | Controladoras y cámaras Dahua (CGI) | Modelo, firmware, serie, reloj | Validar con equipo real |
+| `dahua_nvr` | NVR Dahua (de sistema, con `canales`) | Identidad, discos, uso, cámara conectada por canal | Validar con equipo real |
+| `dahua_retencion` | NVR Dahua (`deteccion: false`, cada 15 min) | Retención real por cámara vs contratada | Validar con equipo real |
 | `simulado` | Demos | Caídas ficticias reproducibles | — |
 
 Para validar uno contra un equipo real: `idcmd sondear --adaptador <nombre> --direccion <ip>
 --usuario <u> [--param clave=valor] [--capturar ./dir]`. Las capturas, revisadas y sin
 datos reales, reemplazan las respuestas armadas en `agente/tests/fixtures/`.
+
+Adaptadores "de sistema" (un NVR que informa por sus cámaras): el objetivo declara
+`canales: {canal: dispositivo_id}` y el planificador acepta resultados solo para esos
+dispositivos. Chequeos lentos que no miden disponibilidad usan `deteccion: false`.
+Dahua: **nunca** usar `configManager.cgi` (RemoteDevice devuelve las claves de las cámaras).
 
 ## Cómo agregar una marca (criterio: sin tocar el núcleo)
 
@@ -141,6 +148,6 @@ datos reales, reemplazan las respuestas armadas en `agente/tests/fixtures/`.
 |---|---|---|
 | E1 | Núcleo del agente (este código), contrato v1 | ✅ Entrega 2 |
 | E1 | Central: esquema Postgres + RLS, API de ingesta | ✅ Entrega 3 |
-| E2 | Adaptadores de control de acceso Hikvision y Dahua + `idcmd sondear` | ✅ Entrega 3b (validar en oficina) |
+| E2 | Adaptadores Hikvision acceso, Dahua acceso/cámara/NVR/retención + `idcmd sondear` | ✅ Entrega 3b (validar en oficina) |
 | E1 | Portal mínimo con login MFA y estado en vivo + modo laboratorio | ⏳ Entrega 4 |
 | E2–E6 | Adaptadores, operación, PWA, piloto, SLA e informe | Pendiente |

@@ -51,6 +51,8 @@ class ConfigAgente(_Estricto):
             if clave in vistos:
                 raise ValueError(f"objetivo duplicado: {o.dispositivo_id} con {o.adaptador}")
             vistos.add(clave)
+            if not o.deteccion:
+                continue
             # Peor caso: la falla empieza justo después de un chequeo exitoso.
             peor_caso = o.intervalo_s * self.deteccion.confirmaciones_falla + MARGEN_ENVIO_PORTAL_S
             if peor_caso > PRESUPUESTO_DETECCION_S:

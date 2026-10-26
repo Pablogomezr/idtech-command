@@ -8,7 +8,7 @@ idcmd credenciales eliminar <ref>
 idcmd diagnostico
 idcmd buzon reenviar --desde 2026-10-01T00:00:00-05:00
 idcmd sondear --adaptador hikvision_acceso --direccion 192.168.1.80 --usuario admin \
-              [--param lectoras_esperadas=2] [--capturar ./captura]
+              [--param lectoras_esperadas=2] [--canales 1-8] [--capturar ./captura]
     Prueba un equipo una vez y muestra lo que el agente vería. No guarda la clave, no
     necesita configuración ni central. Para validar adaptadores con equipos reales.
 """
@@ -120,6 +120,15 @@ def _valor(texto: str) -> str | int | float | bool:
     return texto
 
 
+def _rango_canales(texto: str | None) -> list[int]:
+    """'1-4,7' -> [1, 2, 3, 4, 7]."""
+    canales: list[int] = []
+    for parte in filter(None, (texto or "").split(",")):
+        inicio, _, fin = parte.partition("-")
+        canales += range(int(inicio), int(fin or inicio) + 1)
+    return canales
+
+
 def cmd_sondear(args) -> int:
     descubrir()
     clase = obtener(args.adaptador)
@@ -127,12 +136,15 @@ def cmd_sondear(args) -> int:
     if args.usuario:
         credencial = Credencial(usuario=args.usuario, clave=SecretStr(getpass.getpass("Clave: ")))
     parametros = dict(par.split("=", 1) for par in args.param)
+    canales = {n: uuid.uuid4() for n in _rango_canales(args.canales)}
     objetivo = Objetivo(
         dispositivo_id=uuid.uuid4(),
         adaptador=args.adaptador,
         direccion=args.direccion,
         parametros={k: _valor(v) for k, v in parametros.items()},
+        canales=canales,
     )
+    etiquetas = {objetivo.dispositivo_id: "equipo", **{d: f"canal {n}" for n, d in canales.items()}}
     try:
         adaptador = clase(capturar_en=args.capturar) if args.capturar else clase()
     except TypeError:
@@ -140,11 +152,9 @@ def cmd_sondear(args) -> int:
         return 2
     resultados = asyncio.run(adaptador.chequear(objetivo, credencial))
     for r in resultados:
-        print(
-            json.dumps(
-                r.model_dump(mode="json", exclude={"dispositivo_id"}), indent=2, ensure_ascii=False
-            )
-        )
+        datos = {"de": etiquetas.get(r.dispositivo_id, "?")}
+        datos |= r.model_dump(mode="json", exclude={"dispositivo_id"})
+        print(json.dumps(datos, indent=2, ensure_ascii=False))
     if args.capturar:
         print(f"respuestas crudas guardadas en {args.capturar} (revíselas antes de compartirlas)")
     return 0
@@ -179,6 +189,7 @@ def construir_parser() -> argparse.ArgumentParser:
     sondear.add_argument("--direccion", required=True)
     sondear.add_argument("--usuario", help="pide la clave sin eco; no se guarda")
     sondear.add_argument("--param", action="append", default=[], metavar="CLAVE=VALOR")
+    sondear.add_argument("--canales", metavar="1-8", help="canales del NVR a revisar")
     sondear.add_argument("--capturar", type=Path, metavar="DIRECTORIO")
     sondear.set_defaults(fn=cmd_sondear)
 

@@ -31,10 +31,30 @@ objetivos:
     intervalo_s: 60
     parametros:
       lectoras_esperadas: 2
-  - dispositivo_id: "77777777-7777-4777-8777-777777777777"
-    adaptador: dahua_acceso
-    direccion: "192.168.1.81"     # Controladora Dahua bodega
-    credencial_ref: panel-dahua
+  # NVR Dahua: salud cada minuto y retención real cada 15 minutos.
+  - dispositivo_id: "88888888-8888-4888-8888-888888888888"
+    adaptador: dahua_nvr
+    direccion: "192.168.1.108"
+    credencial_ref: nvr-dahua
+    intervalo_s: 60
+    canales:                      # canal del NVR -> dispositivo de la cámara
+      1: "99999999-9999-4999-8999-999999999991"
+      2: "99999999-9999-4999-8999-999999999992"
+  - dispositivo_id: "88888888-8888-4888-8888-888888888888"
+    adaptador: dahua_retencion
+    direccion: "192.168.1.108"
+    credencial_ref: nvr-dahua
+    intervalo_s: 900
+    deteccion: false              # no mide disponibilidad: fuera del compromiso de 5 min
+    parametros:
+      retencion_contratada_dias: 30
+    canales:
+      1: "99999999-9999-4999-8999-999999999991"
+      2: "99999999-9999-4999-8999-999999999992"
+  # Cámara Dahua: ping directo además de lo que informa el NVR.
+  - dispositivo_id: "99999999-9999-4999-8999-999999999991"
+    adaptador: icmp
+    direccion: "192.168.1.201"
     intervalo_s: 60
   - dispositivo_id: "55555555-5555-4555-8555-555555555555"
     adaptador: simulado          # solo para demos: no es una medición real

@@ -1,0 +1,1 @@
+type=DHI-NVR4108HS-4KS2

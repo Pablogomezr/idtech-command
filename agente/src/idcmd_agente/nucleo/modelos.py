@@ -47,6 +47,9 @@ METRICAS_PERMITIDAS: dict[str, tuple[type, ...]] = {
     "lectoras_desconectadas": (int,),
     "tamper_activo": (bool,),
     "bateria_baja": (bool,),
+    # Almacenamiento de NVR/DVR.
+    "discos_con_error": (int,),
+    "almacenamiento_uso_pct": (int, float),
 }
 
 PATRON_CODIGO = re.compile(r"^[a-z0-9_]{1,64}$")
@@ -97,6 +100,11 @@ class Objetivo(_Estricto):
     credencial_ref: str | None = None
     intervalo_s: int = Field(60, ge=10, le=900)
     parametros: dict[str, str | int | float | bool] = Field(default_factory=dict)
+    # Equipos "de sistema" (NVR): canal del equipo -> dispositivo (cámara) que reporta.
+    canales: dict[int, uuid.UUID] = Field(default_factory=dict)
+    # False para chequeos lentos que no miden disponibilidad (p. ej. retención cada 15 min):
+    # quedan fuera del compromiso de detección <= 5 min.
+    deteccion: bool = True
 
     @field_validator("adaptador")
     @classmethod

@@ -19,6 +19,8 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
 - **Sitio piloto = oficina de IDtech** (Pablo es el cliente). No requiere autorización de
   terceros; se deja un acta interna como plantilla para clientes. Valida la tecnología,
   no la disposición a pagar de un cliente externo.
+- **Oficina:** paneles de acceso Hikvision DS-K2622X (2 puertas, ISAPI, TLS 1.2) y
+  cámaras + NVR Dahua. La retención real por cámara se valida con el NVR Dahua.
 - **Primeros adaptadores nativos: control de acceso Hikvision (ISAPI) y Dahua (CGI).**
   Milestone y BioStar 2 pasan al primer cliente externo. Reemplaza P10 (Dahua sí entra).
 - Modo laboratorio: central, base y agente en un mismo equipo de la oficina; Oracle Cloud

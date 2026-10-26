@@ -59,8 +59,9 @@ class Planificador:
         resultados = await self._observar(objetivo)
         momento = self._reloj()
         eventos: list[EventoEstado] = []
+        propios = {objetivo.dispositivo_id, *objetivo.canales.values()}
         for r in resultados:
-            if r.dispositivo_id != objetivo.dispositivo_id:
+            if r.dispositivo_id not in propios:
                 log.warning("resultado descartado: %s reportó otro dispositivo", objetivo.adaptador)
                 continue
             for agregado in self._agregador.registrar(r):

@@ -1,0 +1,7 @@
+list.info[0].Detail[0].IsError=false
+list.info[0].Detail[0].Path=/dev/sda1
+list.info[0].Detail[0].TotalBytes=4000000000000.000000
+list.info[0].Detail[0].Type=ReadWrite
+list.info[0].Detail[0].UsedBytes=3760000000000.000000
+list.info[0].Name=/dev/sda
+list.info[0].State=Success

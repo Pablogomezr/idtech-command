@@ -21,6 +21,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote, urlencode
 
 import httpx
 
@@ -81,8 +82,14 @@ class ClienteSoloLectura:
         params = kwargs.get("params") or {}
         if not self.permitida(metodo, ruta, params):
             raise OperacionNoPermitida(f"{metodo.upper()} {ruta} {dict(params)} no está permitida")
+        # La consulta se arma aquí y conserva "[]" y ":": algunos firmwares (Dahua) rechazan
+        # `condition.Types%5B0%5D`. Se valida el diccionario y se envía exactamente ese.
+        url = self._url_base + ruta
+        if params:
+            url += "?" + urlencode(params, quote_via=quote, safe="[]:")
+        kwargs.pop("params", None)
         respuesta = await self._cliente.request(
-            metodo, self._url_base + ruta, auth=self._auth or httpx.USE_CLIENT_DEFAULT, **kwargs
+            metodo, url, auth=self._auth or httpx.USE_CLIENT_DEFAULT, **kwargs
         )
         if self._capturar_en is not None:
             self._capturar(ruta, params, respuesta)
