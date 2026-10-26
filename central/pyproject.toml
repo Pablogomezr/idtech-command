@@ -1,0 +1,47 @@
+[project]
+name = "idcmd-central"
+version = "0.1.0"
+description = "Central de IDtech Command: ingesta de agentes, portal y worker."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    "psycopg[binary]>=3.2,<4",
+    "psycopg-pool>=3.2,<4",
+    "pydantic>=2.7,<3",
+]
+
+[project.scripts]
+idcmd-central = "idcmd_central.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27,<1",
+    "ruff>=0.5",
+    # Solo para la prueba extremo a extremo: el agente real contra la central real.
+    "idcmd-agente",
+]
+
+[tool.uv.sources]
+idcmd-agente = { path = "../agente" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/idcmd_central"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

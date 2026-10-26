@@ -19,3 +19,28 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run pytest -q
       - run: docker build -t idcmd-agente:ci .
+
+  central:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: pruebas
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 10
+    env:
+      IDCMD_PRUEBAS_DSN: postgresql://postgres:pruebas@localhost:5432/postgres
+    defaults:
+      run:
+        working-directory: central
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q

@@ -49,7 +49,11 @@ agente/      Python 3.12, imagen Docker única del sitio (idcmd_agente)
   src/idcmd_agente/boveda/       credenciales cifradas
   src/idcmd_agente/adaptadores/  base (registro), http_seguro, icmp, simulado, ...
 contrato/    ingesta-v1.schema.json, generado desde agente/.../modelos.py
-central/     FastAPI: ingesta + portal + worker (Entrega 3)
+central/     FastAPI: ingesta + portal + worker (idcmd_central)
+  migraciones/                   SQL plano, una vez y en orden (idcmd-central migrar)
+  src/idcmd_central/db.py        transacción con SET LOCAL ROLE + app.usuario_id/agente_id
+  src/idcmd_central/ingesta/     POST /api/v1/ingesta
+  src/idcmd_central/contrato.py  espejo del contrato; una prueba lo compara con el esquema
 docs/        adr/, runbooks/, plantillas/, supuestos.md
 despliegue/  Caddy, compose de la central, aprovisionamiento del mini PC
 ```
@@ -63,7 +67,27 @@ uv run pytest -q                         # pruebas
 uv run ruff check . && uv run ruff format --check .
 uv run python scripts/generar_contrato.py  # tras cambiar modelos del contrato
 docker build -t idcmd-agente:dev .
+
+cd central                               # requiere Postgres 16 (ver tests/conftest.py)
+docker run -d --name idcmd-pg -e POSTGRES_PASSWORD=pruebas -p 55432:5432 postgres:16
+uv sync && uv run pytest -q
+IDCMD_DSN_ADMIN=... uv run idcmd-central migrar
+IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "..."
 ```
+
+## Base de datos central (reglas)
+
+- Roles: `idcmd_app` (portal) e `idcmd_ingesta` (agentes), sin login, sin BYPASSRLS, no
+  dueños de tablas. El usuario de login es miembro NOINHERIT: sin `SET LOCAL ROLE` no tiene
+  permisos. La aplicación **nunca** se conecta con el rol dueño.
+- **Toda tabla nueva lleva RLS** (`test_todas_las_tablas_tienen_rls` lo exige) y, si tiene
+  datos de un sitio, `cliente_id` + `sitio_id` con llave foránea compuesta.
+- Visibilidad: `idcmd.sitios_visibles()` (admin todo; técnico sus asignaciones vigentes;
+  cliente su alcance cliente/regional/sitio). Escritura de inventario: solo Admin.
+- Hashes de tokens y claves del portal: el rol `idcmd_app` puede escribirlos, nunca leerlos.
+- `auditoria_accesos` solo admite INSERT.
+- Migraciones: nunca editar una ya aplicada en producción; crear la siguiente.
+- `agregados_hora` sin particionar (volumen manejable); se conservan 90 días.
 
 ## Convenciones
 
@@ -100,6 +124,6 @@ docker build -t idcmd-agente:dev .
 | Etapa | Contenido | Estado |
 |---|---|---|
 | E1 | Núcleo del agente (este código), contrato v1 | ✅ Entrega 2 |
-| E1 | Central: esquema Postgres + RLS, API de ingesta | ⏳ Entrega 3 |
+| E1 | Central: esquema Postgres + RLS, API de ingesta | ✅ Entrega 3 |
 | E1 | Portal mínimo con login MFA y estado en vivo | ⏳ Entrega 4 |
 | E2–E6 | Adaptadores, operación, PWA, piloto, SLA e informe | Pendiente |
