@@ -1,0 +1,44 @@
+# Runbook — Instalar el agente en un sitio
+
+Requisito previo: **autorización escrita del cliente** archivada en el expediente del sitio.
+
+## 1. Preparar el mini PC (en la oficina de IDtech)
+1. Debian estable mínimo, disco completo cifrado con LUKS y desbloqueo por TPM2
+   (`systemd-cryptenroll --tpm2-device=auto`). Secure Boot activo, contraseña de BIOS.
+2. Instalar Docker Engine y `unattended-upgrades`.
+3. Firewall: copiar `despliegue/minipc/nftables.conf`, ajustar subredes del cliente y la IP
+   de la central, `systemctl enable --now nftables`.
+4. Crear `/etc/idcmd/config` y `/etc/idcmd/secretos` (root, 0700).
+
+## 2. Secretos
+```bash
+# Llave de la bóveda (una por sitio; nunca se copia a otro lado)
+docker compose run --rm --user 0 -v /etc/idcmd/secretos:/s agente llave generar --salida /s/llave
+# Token del agente: lo entrega la central al enrolar el agente (se muestra una sola vez)
+printf '%s\n' '<token>' > /etc/idcmd/secretos/token
+chown 10001:10001 /etc/idcmd/secretos/*
+chmod 0400 /etc/idcmd/secretos/*
+```
+
+## 3. Configuración
+Copiar `agente/config.ejemplo.yaml` a `/etc/idcmd/config/agente.yaml` y completar
+`agente_id`, URL de la central y objetivos. **Nunca** poner claves en este archivo.
+Si la red exige proxy, descomentar `HTTPS_PROXY` y `NO_PROXY` en `docker-compose.yml`; si el
+proxy inspecciona TLS, montar la CA del cliente y declararla en `central.ca_adicional`.
+
+## 4. Credenciales de equipos (en el sitio, por consola)
+Pedir al cliente usuarios de **mínimo privilegio** (ONVIF operador, Milestone solo lectura,
+BioStar operador sin acceso a usuarios ni eventos).
+```bash
+docker compose run --rm agente credenciales guardar milestone-principal --usuario svc_idcmd
+docker compose run --rm agente credenciales listar
+```
+
+## 5. Arranque y verificación
+```bash
+docker compose up -d
+docker compose exec agente idcmd --config /config/agente.yaml diagnostico   # debe salir 0
+docker compose logs -f agente
+```
+Prueba de aceptación en sitio: desconectar un equipo de prueba y confirmar que el portal lo
+muestra caído en ≤ 5 minutos. Reconectarlo y confirmar la recuperación.

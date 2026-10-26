@@ -1,0 +1,236 @@
+{
+  "$defs": {
+    "AgregadoHora": {
+      "additionalProperties": false,
+      "description": "Resumen horario por dispositivo y chequeo.\n\nUna misma hora puede llegar en varias partes (una por sesión del agente si\nse reinicia); la central las suma. El `id` es determinista por parte, así\nque reenviar una parte es idempotente.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "dispositivo_id": {
+          "format": "uuid",
+          "title": "Dispositivo Id",
+          "type": "string"
+        },
+        "chequeo": {
+          "title": "Chequeo",
+          "type": "string"
+        },
+        "hora": {
+          "format": "date-time",
+          "title": "Hora",
+          "type": "string"
+        },
+        "muestras_ok": {
+          "minimum": 0,
+          "title": "Muestras Ok",
+          "type": "integer"
+        },
+        "muestras_degradado": {
+          "minimum": 0,
+          "title": "Muestras Degradado",
+          "type": "integer"
+        },
+        "muestras_caido": {
+          "minimum": 0,
+          "title": "Muestras Caido",
+          "type": "integer"
+        },
+        "muestras_desconocido": {
+          "minimum": 0,
+          "title": "Muestras Desconocido",
+          "type": "integer"
+        },
+        "latencia_prom_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latencia Prom Ms"
+        },
+        "latencia_max_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latencia Max Ms"
+        }
+      },
+      "required": [
+        "id",
+        "dispositivo_id",
+        "chequeo",
+        "hora",
+        "muestras_ok",
+        "muestras_degradado",
+        "muestras_caido",
+        "muestras_desconocido"
+      ],
+      "title": "AgregadoHora",
+      "type": "object"
+    },
+    "Estado": {
+      "enum": [
+        "ok",
+        "degradado",
+        "caido",
+        "desconocido"
+      ],
+      "title": "Estado",
+      "type": "string"
+    },
+    "EventoEstado": {
+      "additionalProperties": false,
+      "description": "Cambio de estado confirmado. `observado_at` es el inicio de la racha que lo confirmó.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "dispositivo_id": {
+          "format": "uuid",
+          "title": "Dispositivo Id",
+          "type": "string"
+        },
+        "chequeo": {
+          "title": "Chequeo",
+          "type": "string"
+        },
+        "estado_anterior": {
+          "$ref": "#/$defs/Estado"
+        },
+        "estado_nuevo": {
+          "$ref": "#/$defs/Estado"
+        },
+        "observado_at": {
+          "format": "date-time",
+          "title": "Observado At",
+          "type": "string"
+        },
+        "codigo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Codigo"
+        },
+        "metricas": {
+          "additionalProperties": true,
+          "title": "Metricas",
+          "type": "object"
+        }
+      },
+      "required": [
+        "dispositivo_id",
+        "chequeo",
+        "estado_anterior",
+        "estado_nuevo",
+        "observado_at"
+      ],
+      "title": "EventoEstado",
+      "type": "object"
+    },
+    "Latido": {
+      "additionalProperties": false,
+      "properties": {
+        "agente_version": {
+          "title": "Agente Version",
+          "type": "string"
+        },
+        "reloj_agente": {
+          "format": "date-time",
+          "title": "Reloj Agente",
+          "type": "string"
+        },
+        "inicio_sesion": {
+          "format": "date-time",
+          "title": "Inicio Sesion",
+          "type": "string"
+        },
+        "pendientes": {
+          "minimum": 0,
+          "title": "Pendientes",
+          "type": "integer"
+        },
+        "adaptadores": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Adaptadores",
+          "type": "array"
+        }
+      },
+      "required": [
+        "agente_version",
+        "reloj_agente",
+        "inicio_sesion",
+        "pendientes",
+        "adaptadores"
+      ],
+      "title": "Latido",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Cuerpo de POST /api/v1/ingesta (gzip). Contrato v1.",
+  "properties": {
+    "version_contrato": {
+      "const": "1",
+      "default": "1",
+      "title": "Version Contrato",
+      "type": "string"
+    },
+    "agente_id": {
+      "format": "uuid",
+      "title": "Agente Id",
+      "type": "string"
+    },
+    "enviado_at": {
+      "format": "date-time",
+      "title": "Enviado At",
+      "type": "string"
+    },
+    "latido": {
+      "$ref": "#/$defs/Latido"
+    },
+    "eventos": {
+      "items": {
+        "$ref": "#/$defs/EventoEstado"
+      },
+      "title": "Eventos",
+      "type": "array"
+    },
+    "agregados": {
+      "items": {
+        "$ref": "#/$defs/AgregadoHora"
+      },
+      "title": "Agregados",
+      "type": "array"
+    }
+  },
+  "required": [
+    "agente_id",
+    "enviado_at",
+    "latido"
+  ],
+  "title": "LoteIngesta",
+  "type": "object"
+}

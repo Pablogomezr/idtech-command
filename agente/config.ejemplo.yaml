@@ -1,0 +1,34 @@
+# Configuración del agente IDtech Command (ejemplo).
+# Este archivo NUNCA lleva secretos: el token y la llave van en Docker secrets,
+# y las credenciales de equipos se cargan con `idcmd credenciales guardar`.
+agente_id: "33333333-3333-4333-8333-333333333333"
+
+central:
+  url: "https://command.idtech.com.co"
+  archivo_token: "/run/secrets/idcmd_token"
+  # CA corporativa si la red del cliente inspecciona TLS (opcional):
+  # ca_adicional: "/config/ca-cliente.pem"
+
+deteccion:
+  confirmaciones_falla: 3        # 3 x 60 s + margen <= 5 min
+  confirmaciones_recuperacion: 2
+
+almacenamiento:
+  buzon: "/datos/buzon.sqlite3"
+  boveda: "/datos/boveda.json"
+  archivo_llave: "/run/secrets/idcmd_llave"
+
+# En la Etapa 1 el inventario va aquí; luego se descargará de la central.
+objetivos:
+  - dispositivo_id: "44444444-4444-4444-8444-444444444444"
+    adaptador: icmp
+    direccion: "192.168.10.21"   # Cámara acceso principal
+    intervalo_s: 60
+  - dispositivo_id: "55555555-5555-4555-8555-555555555555"
+    adaptador: simulado          # solo para demos: no es una medición real
+    direccion: "demo"
+    intervalo_s: 60
+    parametros:
+      prob_caida: 0.01
+      duracion_caida_s: 900
+      retencion_contratada_dias: 30

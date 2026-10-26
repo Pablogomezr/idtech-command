@@ -1,0 +1,33 @@
+# Despliegue del agente en el mini PC del sitio. Sin puertos publicados: solo salida.
+services:
+  agente:
+    image: idcmd-agente:0.1.0
+    build: .
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    sysctls:
+      # Ping sin privilegios (sockets ICMP de usuario), en vez de NET_RAW.
+      net.ipv4.ping_group_range: "0 2147483647"
+    tmpfs: [/tmp]
+    volumes:
+      - /etc/idcmd/config:/config:ro
+      - datos:/datos
+    secrets: [idcmd_token, idcmd_llave]
+    # environment:
+    #   HTTPS_PROXY: "http://proxy.cliente.local:3128"   # si la red exige proxy
+    #   NO_PROXY: "192.168.0.0/16,10.0.0.0/8"
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+
+secrets:
+  idcmd_token:
+    file: /etc/idcmd/secretos/token    # propietario 10001, permisos 0400
+  idcmd_llave:
+    file: /etc/idcmd/secretos/llave    # propietario 10001, permisos 0400
+
+volumes:
+  datos:
