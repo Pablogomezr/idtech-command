@@ -7,6 +7,10 @@ idcmd credenciales listar
 idcmd credenciales eliminar <ref>
 idcmd diagnostico
 idcmd buzon reenviar --desde 2026-10-01T00:00:00-05:00
+idcmd sondear --adaptador hikvision_acceso --direccion 192.168.1.80 --usuario admin \
+              [--param lectoras_esperadas=2] [--capturar ./captura]
+    Prueba un equipo una vez y muestra lo que el agente vería. No guarda la clave, no
+    necesita configuración ni central. Para validar adaptadores con equipos reales.
 """
 
 from __future__ import annotations
@@ -14,17 +18,20 @@ from __future__ import annotations
 import argparse
 import asyncio
 import getpass
+import json
 import sys
+import uuid
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
 from pydantic import SecretStr
 
-from .adaptadores import descubrir
+from .adaptadores import descubrir, obtener
 from .boveda import Boveda, BovedaError, Credencial
 from .config import cargar_config
 from .nucleo.buzon import Buzon
+from .nucleo.modelos import Objetivo
 
 CONFIG_POR_DEFECTO = Path("/config/agente.yaml")
 
@@ -102,6 +109,47 @@ def cmd_buzon_reenviar(args) -> int:
     return 0
 
 
+def _valor(texto: str) -> str | int | float | bool:
+    if texto.lower() in ("true", "false"):
+        return texto.lower() == "true"
+    for tipo in (int, float):
+        try:
+            return tipo(texto)
+        except ValueError:
+            pass
+    return texto
+
+
+def cmd_sondear(args) -> int:
+    descubrir()
+    clase = obtener(args.adaptador)
+    credencial = None
+    if args.usuario:
+        credencial = Credencial(usuario=args.usuario, clave=SecretStr(getpass.getpass("Clave: ")))
+    parametros = dict(par.split("=", 1) for par in args.param)
+    objetivo = Objetivo(
+        dispositivo_id=uuid.uuid4(),
+        adaptador=args.adaptador,
+        direccion=args.direccion,
+        parametros={k: _valor(v) for k, v in parametros.items()},
+    )
+    try:
+        adaptador = clase(capturar_en=args.capturar) if args.capturar else clase()
+    except TypeError:
+        print(f"{args.adaptador} no admite --capturar", file=sys.stderr)
+        return 2
+    resultados = asyncio.run(adaptador.chequear(objetivo, credencial))
+    for r in resultados:
+        print(
+            json.dumps(
+                r.model_dump(mode="json", exclude={"dispositivo_id"}), indent=2, ensure_ascii=False
+            )
+        )
+    if args.capturar:
+        print(f"respuestas crudas guardadas en {args.capturar} (revíselas antes de compartirlas)")
+    return 0
+
+
 def construir_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="idcmd", description="Agente en sitio de IDtech Command")
     p.add_argument("--config", type=Path, default=CONFIG_POR_DEFECTO)
@@ -125,6 +173,14 @@ def construir_parser() -> argparse.ArgumentParser:
     eliminar.set_defaults(fn=cmd_credenciales_eliminar)
 
     sub.add_parser("diagnostico", help="verifica la instalación").set_defaults(fn=cmd_diagnostico)
+
+    sondear = sub.add_parser("sondear", help="prueba un equipo una sola vez")
+    sondear.add_argument("--adaptador", required=True)
+    sondear.add_argument("--direccion", required=True)
+    sondear.add_argument("--usuario", help="pide la clave sin eco; no se guarda")
+    sondear.add_argument("--param", action="append", default=[], metavar="CLAVE=VALOR")
+    sondear.add_argument("--capturar", type=Path, metavar="DIRECTORIO")
+    sondear.set_defaults(fn=cmd_sondear)
 
     buzon = sub.add_parser("buzon").add_subparsers(dest="accion", required=True)
     reenviar = buzon.add_parser("reenviar", help="reenvía lo ya enviado desde una fecha")

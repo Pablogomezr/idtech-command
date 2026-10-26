@@ -16,5 +16,7 @@ muestra la más específica que coincida (marca + tipo > tipo > genérica).
 | `pasos_sugeridos` | Separados por `\|`, en el orden en que el técnico debe hacerlos. |
 
 Las filas incluidas son ejemplos para mostrar el formato; reemplácelas con su experiencia.
-Códigos que el agente emite hoy: `sin_respuesta_icmp`, `perdida_paquetes`,
+Códigos que el agente emite hoy: `sin_respuesta_icmp`, `perdida_paquetes`, `sin_respuesta_http`,
+`credencial_rechazada`, `credencial_requerida`, `tamper_activo`, `lectora_desconectada`,
+`bateria_baja`, `reloj_desfasado`,
 `retencion_insuficiente`, `credencial_no_encontrada`, `tiempo_agotado`, `error_adaptador`.

@@ -24,6 +24,18 @@ objetivos:
     adaptador: icmp
     direccion: "192.168.10.21"   # Cámara acceso principal
     intervalo_s: 60
+  - dispositivo_id: "66666666-6666-4666-8666-666666666666"
+    adaptador: hikvision_acceso
+    direccion: "192.168.1.80"     # Panel de acceso puerta principal
+    credencial_ref: panel-hikvision
+    intervalo_s: 60
+    parametros:
+      lectoras_esperadas: 2
+  - dispositivo_id: "77777777-7777-4777-8777-777777777777"
+    adaptador: dahua_acceso
+    direccion: "192.168.1.81"     # Controladora Dahua bodega
+    credencial_ref: panel-dahua
+    intervalo_s: 60
   - dispositivo_id: "55555555-5555-4555-8555-555555555555"
     adaptador: simulado          # solo para demos: no es una medición real
     direccion: "demo"

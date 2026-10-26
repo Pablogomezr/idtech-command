@@ -101,11 +101,27 @@ IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "
   conocimiento de fallas.
 - Comentarios y docstrings explican el *porqué*, no repiten el código.
 
+## Adaptadores disponibles
+
+| Adaptador | Equipos | Lee | Estado |
+|---|---|---|---|
+| `icmp` | Cualquiera con IP | Respuesta, latencia, pérdida | Probado en contenedor |
+| `hikvision_acceso` | Paneles/terminales Hikvision (ISAPI) | Modelo, firmware, serie, reloj, tamper, lectoras, batería | Validar con equipo real |
+| `dahua_acceso` | Controladoras/terminales Dahua (CGI) | Modelo, firmware, serie, reloj | Validar con equipo real |
+| `simulado` | Demos | Caídas ficticias reproducibles | — |
+
+Para validar uno contra un equipo real: `idcmd sondear --adaptador <nombre> --direccion <ip>
+--usuario <u> [--param clave=valor] [--capturar ./dir]`. Las capturas, revisadas y sin
+datos reales, reemplazan las respuestas armadas en `agente/tests/fixtures/`.
+
 ## Cómo agregar una marca (criterio: sin tocar el núcleo)
 
 1. Crear `agente/src/idcmd_agente/adaptadores/<marca>.py` con una clase
    `@registrar("<marca>")` que implemente `chequear(objetivo, credencial)`.
-2. Usar `ClienteSoloLectura` con la lista blanca mínima de operaciones de lectura.
+2. Usar `ClienteSoloLectura` con la lista blanca mínima de `Operacion(metodo, ruta, parametros)`.
+   La lista cubre también los parámetros de la consulta: en APIs tipo CGI (Dahua) la misma
+   ruta lee o actúa según `action` (`reboot`, `openDoor`). Nunca escribir la consulta dentro
+   de la ruta; pasarla en `params`.
 3. Traducir al vocabulario común; nunca devolver credenciales ni datos de personas.
 4. Pruebas con respuestas reales grabadas en `tests/fixtures/<marca>/` (por versión de
    firmware) y prueba de que todo lo que no está en la lista blanca se bloquea.
@@ -125,5 +141,6 @@ IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "
 |---|---|---|
 | E1 | Núcleo del agente (este código), contrato v1 | ✅ Entrega 2 |
 | E1 | Central: esquema Postgres + RLS, API de ingesta | ✅ Entrega 3 |
-| E1 | Portal mínimo con login MFA y estado en vivo | ⏳ Entrega 4 |
+| E2 | Adaptadores de control de acceso Hikvision y Dahua + `idcmd sondear` | ✅ Entrega 3b (validar en oficina) |
+| E1 | Portal mínimo con login MFA y estado en vivo + modo laboratorio | ⏳ Entrega 4 |
 | E2–E6 | Adaptadores, operación, PWA, piloto, SLA e informe | Pendiente |

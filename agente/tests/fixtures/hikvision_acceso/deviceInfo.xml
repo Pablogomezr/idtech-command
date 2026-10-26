@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>Control Acceso</deviceName>
+<deviceID>00000000-0000-0000-0000-000000000000</deviceID>
+<model>DS-K2604T</model>
+<serialNumber>DS-K2604T0000000000AAAA00000000</serialNumber>
+<macAddress>00:00:00:00:00:00</macAddress>
+<firmwareVersion>V2.2.0</firmwareVersion>
+<firmwareReleasedDate>build 210106</firmwareReleasedDate>
+<deviceType>ACS</deviceType>
+</DeviceInfo>

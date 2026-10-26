@@ -85,3 +85,11 @@ async def test_agente_real_entrega_a_la_central_real(bd, datos, dueno, tmp_path)
         cur = await con.execute("SELECT count(*) FROM idcmd.estado_actual")
         assert (await cur.fetchone())[0] == 0
     await enviador.cerrar()
+
+
+def test_vocabulario_de_metricas_igual_en_agente_y_central():
+    from idcmd_agente.nucleo.modelos import METRICAS_PERMITIDAS as DEL_AGENTE
+
+    from idcmd_central.contrato import METRICAS_PERMITIDAS as DE_LA_CENTRAL
+
+    assert DEL_AGENTE == DE_LA_CENTRAL

@@ -14,10 +14,20 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
 | P9 | 30 min de verificación antes del cierre, configurable por contrato. | ADR 0004 |
 | P10 | Dahua no entra al MVP salvo que el sitio piloto tenga muchos equipos Dahua. | Datos del sitio |
 
+## Cambios posteriores (2026-10-26)
+
+- **Sitio piloto = oficina de IDtech** (Pablo es el cliente). No requiere autorización de
+  terceros; se deja un acta interna como plantilla para clientes. Valida la tecnología,
+  no la disposición a pagar de un cliente externo.
+- **Primeros adaptadores nativos: control de acceso Hikvision (ISAPI) y Dahua (CGI).**
+  Milestone y BioStar 2 pasan al primer cliente externo. Reemplaza P10 (Dahua sí entra).
+- Modo laboratorio: central, base y agente en un mismo equipo de la oficina; Oracle Cloud
+  Bogotá cuando el piloto esté estable.
+
 ## Pendientes de Pablo (ruta crítica, no son código)
-- Autorización escrita del cliente para instalar el agente.
-- Datos del sitio piloto: versión/edición de Milestone y BioStar, cantidad de equipos por
-  marca, salida a internet (directa o proxy), VLAN, ICMP permitido.
+- Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.
+- Usuario de solo lectura (u operador) en cada panel para el agente.
+- Equipo anfitrión del laboratorio (mini PC Linux o PC Windows con Docker Desktop).
 - Cuenta OCI con Bogotá como *home region* (no se puede cambiar después).
 - Mini PC: Intel N100 o similar, 16 GB RAM, 512 GB SSD, TPM 2.0, idealmente 2 puertos de red.
 - Reglas de SLA del contrato: tiempos de respuesta/solución por prioridad, horario.

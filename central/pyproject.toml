@@ -25,7 +25,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-idcmd-agente = { path = "../agente" }
+idcmd-agente = { path = "../agente", editable = true }
 
 [build-system]
 requires = ["hatchling"]

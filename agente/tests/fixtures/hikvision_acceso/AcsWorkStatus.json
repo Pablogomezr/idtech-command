@@ -1,0 +1,14 @@
+{
+  "AcsWorkStatus": {
+    "doorLockStatus": [0, 0],
+    "doorStatus": [4, 4],
+    "magneticStatus": [0, 0],
+    "batteryVoltage": 0,
+    "batteryLowVoltage": false,
+    "powerSupplyStatus": "ACPowerSupply",
+    "hostAntiDismantleStatus": "close",
+    "cardReaderOnlineStatus": [1, 1, 0, 0],
+    "cardReaderAntiDismantleStatus": [0, 0, 0, 0],
+    "cardNum": 0
+  }
+}

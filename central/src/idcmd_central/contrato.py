@@ -36,6 +36,11 @@ METRICAS_PERMITIDAS: dict[str, tuple[type, ...]] = {
     "firmware": (str,),
     "modelo": (str,),
     "desfase_reloj_s": (int, float),
+    "numero_serie": (str,),
+    # Control de acceso: salud del panel, nunca eventos ni marcaciones de personas.
+    "lectoras_desconectadas": (int,),
+    "tamper_activo": (bool,),
+    "bateria_baja": (bool,),
 }
 
 PATRON_CODIGO = re.compile(r"^[a-z0-9_]{1,64}$")

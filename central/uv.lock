@@ -199,7 +199,7 @@ wheels = [
 [[package]]
 name = "idcmd-agente"
 version = "0.1.0"
-source = { directory = "../agente" }
+source = { editable = "../agente" }
 dependencies = [
     { name = "cryptography" },
     { name = "httpx" },
@@ -258,7 +258,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx", specifier = ">=0.27,<1" },
-    { name = "idcmd-agente", directory = "../agente" },
+    { name = "idcmd-agente", editable = "../agente" },
     { name = "pytest", specifier = ">=8" },
     { name = "pytest-asyncio", specifier = ">=0.23" },
     { name = "ruff", specifier = ">=0.5" },
