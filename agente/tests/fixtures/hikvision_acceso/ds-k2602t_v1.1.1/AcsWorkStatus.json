@@ -1,0 +1,23 @@
+{
+        "AcsWorkStatus":
+        {
+                "doorLockStatus": [0, 0],
+                "doorStatus": [4, 4],
+                "magneticStatus": [0, 0],
+                "caseStatus": [],
+                "batteryVoltage": 0,
+                "batteryLowVoltage": true,
+                "powerSupplyStatus": "ACPowerSupply",
+                "multiDoorInterlockStatus": "close",
+                "antiSneakStatus": "close",
+                "hostAntiDismantleStatus": "open",
+                "cardReaderOnlineStatus": [1, 3],
+                "cardReaderAntiDismantleStatus": [],
+                "cardReaderVerifyMode": [7, 3, 3, 3],
+                "setupAlarmStatus": [],
+                "alarmInStatus": [],
+                "alarmOutStatus": [],
+                "cardNum": 1,
+                "antiSneakServerStatus": "disable"
+        }
+}

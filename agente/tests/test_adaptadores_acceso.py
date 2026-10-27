@@ -6,6 +6,7 @@ de la lista blanca sale a la red, en particular marcaciones, apertura de puertas
 
 import json
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -294,3 +295,59 @@ def test_comando_sondear(monkeypatch, capsys, tmp_path):
     assert "Clave-Lectura-2026" not in salida
     capturas = sorted(p.name for p in (tmp_path / "captura").iterdir())
     assert len(capturas) == 4 and all(".200.txt" in c for c in capturas)
+
+
+# --- Respuestas reales: DS-K2602T de la oficina (2026-10-27) ----------------------------
+
+K2602T = "hikvision_acceso/ds-k2602t_v1.1.1"
+MOMENTO_CAPTURA = datetime(2026, 10, 27, 17, 13, 8, 900000, tzinfo=UTC)  # 12:13:08,9 Bogotá
+
+
+async def _hikvision_real(**parametros):
+    with respx.mock() as mock:
+        mock.get(f"{BASE}/ISAPI/System/deviceInfo").respond(
+            200, content=_leer(f"{K2602T}/deviceInfo.xml")
+        )
+        mock.get(f"{BASE}/ISAPI/System/time").respond(200, content=_leer(f"{K2602T}/time.xml"))
+        mock.get(f"{BASE}/ISAPI/AccessControl/AcsWorkStatus").respond(
+            200, content=_leer(f"{K2602T}/AcsWorkStatus.json")
+        )
+        async with httpx.AsyncClient() as cliente:
+            adaptador = AdaptadorHikvisionAcceso(
+                cliente_http=cliente, reloj=RelojFalso(MOMENTO_CAPTURA)
+            )
+            [r] = await adaptador.chequear(_objetivo("hikvision_acceso", **parametros), CRED)
+    return r
+
+
+async def test_panel_real_reporta_sus_cuatro_hallazgos():
+    r = await _hikvision_real(lectoras_esperadas=2)
+    assert (r.estado, r.codigo) == (Estado.DEGRADADO, "tamper_activo")  # el más grave
+    m = r.metricas
+    assert m["modelo"] == "DS-K2602T" and m["firmware"] == "V1.1.1 build 20230916"
+    assert m["tamper_activo"] is True
+    assert m["bateria_baja"] is True
+    assert m["lectoras_desconectadas"] == 1
+    # El reloj de pared está bien (−1,9 s); lo que está mal es la zona horaria.
+    assert m["desfase_reloj_s"] == -1.9
+    assert m["zona_horaria_utc_h"] == 0.0
+    assert m["ntp_activo"] is False
+
+
+async def test_zona_horaria_incorrecta_no_se_confunde_con_reloj_desfasado():
+    import json as _json
+
+    acs = _json.loads(_leer(f"{K2602T}/AcsWorkStatus.json"))
+    acs["AcsWorkStatus"].update(hostAntiDismantleStatus="close", batteryLowVoltage=False)
+    with respx.mock() as mock:
+        mock.get(f"{BASE}/ISAPI/System/deviceInfo").respond(
+            200, content=_leer(f"{K2602T}/deviceInfo.xml")
+        )
+        mock.get(f"{BASE}/ISAPI/System/time").respond(200, content=_leer(f"{K2602T}/time.xml"))
+        mock.get(f"{BASE}/ISAPI/AccessControl/AcsWorkStatus").respond(200, json=acs)
+        async with httpx.AsyncClient() as cliente:
+            adaptador = AdaptadorHikvisionAcceso(
+                cliente_http=cliente, reloj=RelojFalso(MOMENTO_CAPTURA)
+            )
+            [r] = await adaptador.chequear(_objetivo("hikvision_acceso"), CRED)
+    assert (r.estado, r.codigo) == (Estado.DEGRADADO, "zona_horaria_incorrecta")

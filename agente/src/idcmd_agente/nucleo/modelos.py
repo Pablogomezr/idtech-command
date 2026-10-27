@@ -42,6 +42,8 @@ METRICAS_PERMITIDAS: dict[str, tuple[type, ...]] = {
     "firmware": (str,),
     "modelo": (str,),
     "desfase_reloj_s": (int, float),
+    "zona_horaria_utc_h": (int, float),  # zona configurada en el equipo (p. ej. -5)
+    "ntp_activo": (bool,),
     "numero_serie": (str,),
     # Control de acceso: salud del panel, nunca eventos ni marcaciones de personas.
     "lectoras_desconectadas": (int,),

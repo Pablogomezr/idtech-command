@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>Access Controller</deviceName>
+<model>DS-K2602T</model>
+<serialNumber>DS-K2602T00000000V010101ENAW0000000</serialNumber>
+<firmwareVersion>V1.1.1</firmwareVersion>
+<firmwareReleasedDate>build 20230916</firmwareReleasedDate>
+<deviceType>ACS</deviceType>
+</DeviceInfo>

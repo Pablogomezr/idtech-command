@@ -11,7 +11,8 @@ Parámetros del objetivo:
     lectoras_esperadas    lectoras conectadas que debe tener el panel; sin este dato no se
                           evalúan (los puertos libres también se reportan como "fuera de línea")
     umbral_desfase_s      desfase de reloj tolerado (120 s por defecto)
-    zona_horaria_equipo   si el equipo no informa zona horaria ("America/Bogota")
+    zona_horaria_equipo   zona donde está instalado el equipo ("America/Bogota"); si el
+                          equipo tiene otra configurada se informa zona_horaria_incorrecta
 
 PENDIENTE DE VALIDAR con un equipo real de la oficina: los nombres de campos de
 AcsWorkStatus varían entre firmwares. Las pruebas usan respuestas armadas desde la
@@ -26,13 +27,14 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any, ClassVar
+from zoneinfo import ZoneInfo
 
 import httpx
 
 from ..boveda import Credencial
 from ..nucleo.modelos import Estado, Objetivo, ResultadoChequeo, ahora_utc
 from .base import registrar
-from .comun import a_utc, desfase_segundos, texto_seguro, zona_posix
+from .comun import texto_seguro, zona_posix
 from .http_seguro import ClienteSoloLectura, Operacion
 
 CHEQUEO = "hikvision_acceso"
@@ -124,9 +126,15 @@ class AdaptadorHikvisionAcceso:
         }
         hallazgos: list[str] = []
 
-        desfase = self._desfase(r_hora, p)
-        if desfase is not None:
+        hora = self._hora(r_hora, p)
+        if hora is not None:
+            desfase, zona_h, zona_esperada_h, ntp = hora
             metricas["desfase_reloj_s"] = desfase
+            metricas["ntp_activo"] = ntp
+            if zona_h is not None:
+                metricas["zona_horaria_utc_h"] = zona_h
+                if zona_h != zona_esperada_h:
+                    hallazgos.append("zona_horaria_incorrecta")
             if abs(desfase) > float(p.get("umbral_desfase_s", 120)):
                 hallazgos.append("reloj_desfasado")
 
@@ -151,11 +159,24 @@ class AdaptadorHikvisionAcceso:
 
         if hallazgos:
             # Un solo código por resultado: el más grave según este orden.
-            orden = ["tamper_activo", "lectora_desconectada", "bateria_baja", "reloj_desfasado"]
+            orden = [
+                "tamper_activo",
+                "lectora_desconectada",
+                "bateria_baja",
+                "zona_horaria_incorrecta",
+                "reloj_desfasado",
+            ]
             return [resultado(Estado.DEGRADADO, min(hallazgos, key=orden.index), **metricas)]
         return [resultado(Estado.OK, **metricas)]
 
-    def _desfase(self, respuesta: httpx.Response, p: dict) -> float | None:
+    def _hora(self, respuesta: httpx.Response, p: dict):
+        """(desfase del reloj de pared en s, zona del equipo en h, zona esperada en h, NTP).
+
+        Se separan dos fallas distintas: el reloj de pared (la hora que marca el equipo
+        frente a la hora local real) y la zona horaria configurada. Un panel en Bogotá que
+        marca la hora correcta pero tiene zona UTC+0 registra sus eventos 5 h corridos al
+        integrarse con otros sistemas, aunque en su pantalla todo se vea bien.
+        """
         if respuesta.status_code != 200:
             return None
         try:
@@ -163,10 +184,18 @@ class AdaptadorHikvisionAcceso:
             hora = datetime.fromisoformat(datos["localTime"])
         except (ET.ParseError, KeyError, ValueError):
             return None
-        if hora.tzinfo is None and (zona := zona_posix(datos.get("timeZone", ""))):
-            hora = hora.replace(tzinfo=zona)
-        hora_utc = a_utc(hora, str(p.get("zona_horaria_equipo", "America/Bogota")))
-        return desfase_segundos(hora_utc, self._reloj())
+        zona = hora.utcoffset() if hora.tzinfo else None
+        if zona is None and (posix := zona_posix(datos.get("timeZone", ""))):
+            zona = posix.utcoffset(None)
+        local_esperada = self._reloj().astimezone(
+            ZoneInfo(str(p.get("zona_horaria_equipo", "America/Bogota")))
+        )
+        desfase = round(
+            (hora.replace(tzinfo=None) - local_esperada.replace(tzinfo=None)).total_seconds(), 1
+        )
+        zona_esperada_h = local_esperada.utcoffset().total_seconds() / 3600
+        zona_h = zona.total_seconds() / 3600 if zona is not None else None
+        return desfase, zona_h, zona_esperada_h, datos.get("timeMode", "").upper() == "NTP"
 
     @staticmethod
     def _estado_acceso(respuesta: httpx.Response) -> dict | None:

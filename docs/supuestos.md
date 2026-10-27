@@ -19,7 +19,8 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
 - **Sitio piloto = oficina de IDtech** (Pablo es el cliente). No requiere autorización de
   terceros; se deja un acta interna como plantilla para clientes. Valida la tecnología,
   no la disposición a pagar de un cliente externo.
-- **Oficina:** paneles de acceso Hikvision DS-K2622X (2 puertas, ISAPI, TLS 1.2) y
+- **Oficina:** panel de acceso Hikvision **DS-K2602T** (2 puertas, ISAPI, http puerto 80;
+  inicialmente se creyó DS-K2622X, SADP mostró el modelo real) y
   cámaras + NVR Dahua. La retención real por cámara se valida con el NVR Dahua.
 - **Primeros adaptadores nativos: control de acceso Hikvision (ISAPI) y Dahua (CGI).**
   Milestone y BioStar 2 pasan al primer cliente externo. Reemplaza P10 (Dahua sí entra).
@@ -37,6 +38,11 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
 - Canales 3 y 4 sin cámara: el NVR informa los canales vacíos igual que una cámara
   desconectada. Regla: solo se vigilan los canales declarados en el inventario (`canales`);
   el inventario de cada sitio debe listar exactamente los canales con cámara.
+
+- Panel DS-K2602T (fw V1.1.1 build 20230916) en 192.168.1.200: el adaptador leyó todo y
+  encontró caja abierta, batería baja (0 V), 1 de 2 lectoras en línea y **zona horaria
+  UTC+0 sin NTP** (la hora de pared es correcta: −1,9 s). Se separó `zona_horaria_incorrecta`
+  de `reloj_desfasado`. Pendiente: qué significa el valor 3 en `cardReaderOnlineStatus`.
 
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.
