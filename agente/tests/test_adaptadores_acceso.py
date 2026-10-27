@@ -388,7 +388,9 @@ def test_lectoras_faltantes(en_linea, esperadas, direcciones, faltantes):
 async def test_panel_real_totales_y_modos_de_verificacion():
     r = await _hikvision_real(lectoras_direcciones="1,3")
     assert r.metricas["tarjetas_registradas"] == 1
-    assert r.metricas["modos_verificacion"] == "1:7,3:3"  # lectora 1 huella o tarjeta; 3 tarjeta
+    # Las lectoras 1 y 3 tienen el mismo modo (iVMS: huella o tarjeta) aunque el panel
+    # reporte [7, 3, 3, 3]: se envía la lista sin atribuir códigos a lectoras.
+    assert r.metricas["modos_verificacion"] == "7,3,3,3"
     assert "usuarios_registrados" not in r.metricas  # el conteo respondió 404
 
 
@@ -399,8 +401,8 @@ async def test_total_de_usuarios():
     assert r.metricas["usuarios_registrados"] == 12
 
 
-def test_modos_verificacion_sin_direcciones():
+def test_modos_verificacion_lista_cruda():
     from idcmd_agente.adaptadores.hikvision_acceso import modos_verificacion
 
-    assert modos_verificacion([7, 3]) == "1:7,2:3"
+    assert modos_verificacion([7, 3]) == "7,3"
     assert modos_verificacion("x") is None

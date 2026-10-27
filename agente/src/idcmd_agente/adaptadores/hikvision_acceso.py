@@ -50,7 +50,8 @@ OPERACIONES = [
     Operacion("GET", r"/ISAPI/AccessControl/UserInfo/Count", {"format": "json"}),
 ]
 
-# Códigos de `cardReaderVerifyMode` (tabla de Hikvision; 3 y 7 por confirmar en la oficina).
+# Códigos de `cardReaderVerifyMode` (tabla de Hikvision; el 7 = "huella o tarjeta" quedó
+# confirmado en la oficina; el resto, por confirmar).
 # El agente envía el código; la central muestra el texto.
 MODOS_VERIFICACION = {
     1: "inactiva",
@@ -113,18 +114,18 @@ def lectoras_faltantes(
     return max(0, total - conectadas)
 
 
-def modos_verificacion(modos: object, direcciones: object = None) -> str | None:
-    """[7, 3, 3, 3] -> "1:7,2:3,3:3,4:3" (posición = dirección de la lectora).
+def modos_verificacion(modos: object) -> str | None:
+    """[7, 3, 3, 3] -> "7,3,3,3", sin asignar cada código a una lectora.
 
-    Con `lectoras_direcciones` ("1,3") se informan solo las lectoras instaladas: "1:7,3:3".
+    En el DS-K2602T (fw V1.1.1) las posiciones NO corresponden a las direcciones de las
+    lectoras: las lectoras 1 y 3 tienen el mismo modo configurado ("huella o tarjeta",
+    confirmado en iVMS-4200) y el panel reporta [7, 3, 3, 3]. Se envía la lista tal cual:
+    sirve para detectar cualquier cambio de configuración sin afirmar el modo de cada
+    lectora. El modo exacto por lectora requiere leer su plan de autenticación (pendiente).
     """
     if not isinstance(modos, list) or not all(isinstance(m, int) for m in modos):
         return None
-    pares = list(enumerate(modos, start=1))
-    if direcciones is not None:
-        instaladas = {int(d) for d in str(direcciones).replace(" ", "").split(",") if d}
-        pares = [(d, m) for d, m in pares if d in instaladas]
-    return ",".join(f"{d}:{m}" for d, m in pares)[:64] or None
+    return ",".join(map(str, modos))[:64] or None
 
 
 @registrar("hikvision_acceso")
@@ -238,9 +239,7 @@ class AdaptadorHikvisionAcceso:
                     hallazgos.append("lectora_desconectada")
             if isinstance(estado_acs.get("cardNum"), int):
                 metricas["tarjetas_registradas"] = estado_acs["cardNum"]
-            modos = modos_verificacion(
-                estado_acs.get("cardReaderVerifyMode"), p.get("lectoras_direcciones")
-            )
+            modos = modos_verificacion(estado_acs.get("cardReaderVerifyMode"))
             if modos:
                 metricas["modos_verificacion"] = modos
 

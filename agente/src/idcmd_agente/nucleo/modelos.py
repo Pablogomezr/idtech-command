@@ -61,7 +61,7 @@ METRICAS_PERMITIDAS: dict[str, tuple[type, ...]] = {
     # (ADR 0008).
     "usuarios_registrados": (int,),
     "tarjetas_registradas": (int,),
-    "modos_verificacion": (str,),  # "direccion:codigo,..." p. ej. "1:7,3:3"
+    "modos_verificacion": (str,),  # códigos tal como los reporta el panel, p. ej. "7,3,3,3"
 }
 
 # Mediciones que varían en cada chequeo: no cuentan como "cambio" para el historial de
