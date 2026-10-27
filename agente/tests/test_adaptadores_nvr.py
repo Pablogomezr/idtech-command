@@ -396,3 +396,72 @@ async def test_retencion_proyectada_en_disco_a_medio_llenar():
         )
     # 29,8 días reales al 94 % -> 31,7 proyectados: cumple los 30 contratados.
     assert (r[CAM_1].estado, r[CAM_1].metricas["retencion_proyectada_dias"]) == (Estado.OK, 31.7)
+
+
+def test_laboratorio_guardar_una_vez_y_sondear_sin_escribir_la_clave(monkeypatch, capsys, tmp_path):
+    """La clave se escribe una vez (dos, para confirmar) y queda cifrada; sondear la reutiliza."""
+    from idcmd_agente.cli import main
+
+    secretos = tmp_path / "secretos"
+    claves = iter(["Clave-Lectura-2026", "Clave-Lectura-2026"])
+    monkeypatch.setattr("getpass.getpass", lambda _: next(claves))
+    assert (
+        main(
+            [
+                "credenciales",
+                "guardar",
+                "nvr",
+                "--usuario",
+                "idcmd_monitor",
+                "--secretos",
+                str(secretos),
+            ]
+        )
+        == 0
+    )
+    assert "Clave-Lectura-2026" not in (secretos / "boveda.json").read_text()
+
+    monkeypatch.setattr("getpass.getpass", lambda _: pytest.fail("no debe pedir la clave"))
+    with respx.mock() as mock:
+        _mock_nvr(mock)
+        assert (
+            main(
+                [
+                    "sondear",
+                    "--adaptador",
+                    "dahua_nvr",
+                    "--direccion",
+                    IP,
+                    "--credencial",
+                    "nvr",
+                    "--secretos",
+                    str(secretos),
+                    "--canales",
+                    "1-2",
+                ]
+            )
+            == 0
+        )
+    assert '"modelo": "DHI-NVR4108HS-4KS2"' in capsys.readouterr().out
+
+
+def test_laboratorio_clave_mal_confirmada_no_se_guarda(monkeypatch, tmp_path):
+    from idcmd_agente.cli import main
+
+    claves = iter(["Clave-Lectura-2026", "Clave-Lectura-2O26"])  # error de tipeo
+    monkeypatch.setattr("getpass.getpass", lambda _: next(claves))
+    assert (
+        main(
+            [
+                "credenciales",
+                "guardar",
+                "nvr",
+                "--usuario",
+                "idcmd_monitor",
+                "--secretos",
+                str(tmp_path / "s"),
+            ]
+        )
+        == 1
+    )
+    assert not (tmp_path / "s" / "boveda.json").exists()

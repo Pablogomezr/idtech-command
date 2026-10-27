@@ -7,8 +7,10 @@ idcmd credenciales listar
 idcmd credenciales eliminar <ref>
 idcmd diagnostico
 idcmd buzon reenviar --desde 2026-10-01T00:00:00-05:00
+idcmd credenciales guardar nvr --usuario idcmd_monitor --secretos /secretos   (laboratorio)
 idcmd sondear --adaptador hikvision_acceso --direccion 192.168.1.80 --usuario admin \
               [--param lectoras_esperadas=2] [--canales 1-8] [--capturar ./captura]
+              (o --credencial nvr --secretos /secretos en vez de --usuario)
     Prueba un equipo una vez y muestra lo que el agente vería. No guarda la clave, no
     necesita configuración ni central. Para validar adaptadores con equipos reales.
 """
@@ -36,7 +38,16 @@ from .nucleo.modelos import Objetivo
 CONFIG_POR_DEFECTO = Path("/config/agente.yaml")
 
 
-def _boveda(args) -> Boveda:
+def _boveda(args, crear: bool = False) -> Boveda:
+    """Bóveda del agente (según la configuración) o, con --secretos, una carpeta local de
+    laboratorio con `boveda.json` y `llave` (la llave se crea en el primer `guardar`)."""
+    if getattr(args, "secretos", None):
+        carpeta = Path(args.secretos)
+        llave = carpeta / "llave"
+        if crear and not llave.exists():
+            carpeta.mkdir(parents=True, exist_ok=True)
+            Boveda.escribir_llave(llave, Boveda.generar_llave())
+        return Boveda.desde_archivos(carpeta / "boveda.json", llave)
     alm = cargar_config(args.config).almacenamiento
     return Boveda.desde_archivos(alm.boveda, alm.archivo_llave)
 
@@ -59,7 +70,9 @@ def cmd_credenciales_guardar(args) -> int:
     if clave != getpass.getpass("Repita la clave: "):
         print("las claves no coinciden", file=sys.stderr)
         return 1
-    _boveda(args).guardar(args.ref, Credencial(usuario=args.usuario, clave=SecretStr(clave)))
+    _boveda(args, crear=True).guardar(
+        args.ref, Credencial(usuario=args.usuario, clave=SecretStr(clave))
+    )
     print(f"credencial {args.ref!r} guardada cifrada en este equipo")
     return 0
 
@@ -133,7 +146,9 @@ def cmd_sondear(args) -> int:
     descubrir()
     clase = obtener(args.adaptador)
     credencial = None
-    if args.usuario:
+    if args.credencial:
+        credencial = _boveda(args).obtener(args.credencial)
+    elif args.usuario:
         credencial = Credencial(usuario=args.usuario, clave=SecretStr(getpass.getpass("Clave: ")))
     parametros = dict(par.split("=", 1) for par in args.param)
     canales = {n: uuid.uuid4() for n in _rango_canales(args.canales)}
@@ -186,13 +201,18 @@ def construir_parser() -> argparse.ArgumentParser:
     generar.set_defaults(fn=cmd_llave_generar)
 
     cred = sub.add_parser("credenciales").add_subparsers(dest="accion", required=True)
+    ayuda_secretos = "carpeta local de laboratorio (boveda.json + llave), en vez de --config"
     guardar = cred.add_parser("guardar", help="guarda o reemplaza una credencial")
     guardar.add_argument("ref")
     guardar.add_argument("--usuario", required=True)
+    guardar.add_argument("--secretos", type=Path, help=ayuda_secretos)
     guardar.set_defaults(fn=cmd_credenciales_guardar)
-    cred.add_parser("listar").set_defaults(fn=cmd_credenciales_listar)
+    listar = cred.add_parser("listar")
+    listar.add_argument("--secretos", type=Path, help=ayuda_secretos)
+    listar.set_defaults(fn=cmd_credenciales_listar)
     eliminar = cred.add_parser("eliminar")
     eliminar.add_argument("ref")
+    eliminar.add_argument("--secretos", type=Path, help=ayuda_secretos)
     eliminar.set_defaults(fn=cmd_credenciales_eliminar)
 
     sub.add_parser("diagnostico", help="verifica la instalación").set_defaults(fn=cmd_diagnostico)
@@ -200,7 +220,10 @@ def construir_parser() -> argparse.ArgumentParser:
     sondear = sub.add_parser("sondear", help="prueba un equipo una sola vez")
     sondear.add_argument("--adaptador", required=True)
     sondear.add_argument("--direccion", required=True)
-    sondear.add_argument("--usuario", help="pide la clave sin eco; no se guarda")
+    quien = sondear.add_mutually_exclusive_group()
+    quien.add_argument("--usuario", help="pide la clave sin eco; no se guarda")
+    quien.add_argument("--credencial", metavar="REF", help="usa una credencial de la bóveda")
+    sondear.add_argument("--secretos", type=Path, help=ayuda_secretos)
     sondear.add_argument("--param", action="append", default=[], metavar="CLAVE=VALOR")
     sondear.add_argument("--canales", metavar="1-8", help="canales del NVR a revisar")
     sondear.add_argument("--capturar", type=Path, metavar="DIRECTORIO")

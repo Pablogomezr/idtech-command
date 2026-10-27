@@ -9,3 +9,5 @@ boveda.json
 *.pem
 *.key
 .env
+secretos/
+captura*/

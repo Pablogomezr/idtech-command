@@ -122,7 +122,10 @@ IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "
 | `simulado` | Demos | Caídas ficticias reproducibles | — |
 
 Para validar uno contra un equipo real: `idcmd sondear --adaptador <nombre> --direccion <ip>
---usuario <u> [--param clave=valor] [--capturar ./dir]`. Las capturas, revisadas y sin
+--usuario <u> [--param clave=valor] [--capturar ./dir]`. En laboratorio, mejor guardar la
+clave una vez (`idcmd credenciales guardar <ref> --usuario <u> --secretos ./secretos`, pide
+confirmarla) y usar `--credencial <ref> --secretos ./secretos`: escribir la clave a ciegas en
+cada prueba bloqueó cuentas del NVR de la oficina. Nunca poner claves en scripts ni en el chat. Las capturas, revisadas y sin
 datos reales, reemplazan las respuestas armadas en `agente/tests/fixtures/`.
 
 Instantáneas: además de los eventos (cambio de estado), el agente envía las métricas
