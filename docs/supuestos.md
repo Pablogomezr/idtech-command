@@ -92,6 +92,11 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
   canal 5 como `"Empty"` (no `"Disconnected"`). Ahora se informa `canal_sin_camara`
   (causa de configuración) y no `camara_desconectada_nvr`. Pendiente: qué responde el NVR
   cuando a la cuenta le falta permiso sobre un canal.
+- Retención por canal (2026-10-27): el filtro sí funciona (canal 3 pedido -> `Channel=2`
+  en la respuesta), pero los tres canales daban 120,3 días porque el canal 3 conserva
+  archivos de junio de una cámara anterior. La más antigua no dice si la cámara sigue
+  grabando: se agregó la búsqueda de grabación en las últimas 2 h (`sin_grabacion_reciente`)
+  y la verificación del canal de la respuesta (`busqueda_canal_inconsistente`).
 
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.

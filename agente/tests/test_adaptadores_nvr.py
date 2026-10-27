@@ -173,7 +173,9 @@ DISCO_LLENO = _leer("dahua_nvr/getDeviceAllInfo.txt").replace(
 )  # 99,8 %: sobrescribiendo
 
 
-def _mock_retencion(mock, siguiente=None, crear_status=200, discos=DISCO_LLENO):
+def _mock_retencion(
+    mock, siguiente=None, crear_status=200, discos=DISCO_LLENO, recientes=None, desfase_canal=0
+):
     mock.get(f"{BASE}/cgi-bin/storageDevice.cgi", params={"action": "getDeviceAllInfo"}).respond(
         200, content=discos
     )
@@ -181,12 +183,25 @@ def _mock_retencion(mock, siguiente=None, crear_status=200, discos=DISCO_LLENO):
     mock.get(ruta, params={"action": "factory.create"}).respond(
         crear_status, content=_leer("dahua_nvr/factory_create.txt")
     )
-    mock.get(ruta, params={"action": "findFile"}).respond(
-        200, content=_leer("dahua_nvr/findFile.txt")
-    )
-    mock.get(ruta, params={"action": "findNextFile"}).respond(
-        200, content=siguiente if siguiente is not None else _leer("dahua_nvr/findNextFile.txt")
-    )
+    # El NVR responde con el canal numerado desde 0: findNextFile "recuerda" el canal pedido.
+    pedido = {"canal": 1}
+
+    def buscar(request):
+        pedido["canal"] = int(request.url.params["condition.Channel"])
+        pedido["reciente"] = not request.url.params["condition.StartTime"].startswith("2000")
+        return httpx.Response(200, content=_leer("dahua_nvr/findFile.txt"))
+
+    def siguiente_archivo(request):
+        if pedido["reciente"] and recientes is not None:
+            return httpx.Response(200, content=recientes)
+        cuerpo = siguiente if siguiente is not None else _leer("dahua_nvr/findNextFile.txt")
+        canal = pedido["canal"] - 1 + desfase_canal
+        return httpx.Response(
+            200, content=cuerpo.replace(b"Channel=0", f"Channel={canal}".encode())
+        )
+
+    mock.get(ruta, params={"action": "findFile"}).mock(side_effect=buscar)
+    mock.get(ruta, params={"action": "findNextFile"}).mock(side_effect=siguiente_archivo)
     cerrar = mock.get(ruta, params={"action": "close"}).respond(200, content=b"OK")
     destruir = mock.get(ruta, params={"action": "destroy"}).respond(200, content=b"OK")
     return cerrar, destruir
@@ -212,7 +227,7 @@ async def test_retencion_real_frente_a_contratada(contratada, estado, codigo):
     assert (r[CAM_1].estado, r[CAM_1].codigo) == (estado, codigo)
     assert r[CAM_1].chequeo == "dahua_retencion"
     # La búsqueda se cierra siempre, para no agotar los objetos del NVR.
-    assert cerrar.call_count == destruir.call_count == 2
+    assert cerrar.call_count == destruir.call_count == 4  # 2 canales x 2 búsquedas
     # Los corchetes viajan sin codificar (algunos firmwares rechazan %5B0%5D).
     assert "condition.Types[0]=dav" in url_busqueda
 
@@ -485,3 +500,33 @@ def test_canal_vacio_no_es_camara_desconectada():
         (camaras[3], Estado.OK, None),
         (camaras[5], Estado.CAIDO, "canal_sin_camara"),
     ]
+
+
+async def test_camara_que_dejo_de_grabar_no_pasa_por_retencion_ok():
+    """Canal 3 de la oficina: archivos de junio de una cámara anterior y nada reciente.
+    Antes salía "120 días, ok"; ahora es sin_grabacion_reciente."""
+    with respx.mock() as mock:
+        _mock_retencion(mock, recientes=b"found=0\r\n")
+        r = _por_dispositivo(
+            await _correr(
+                AdaptadorDahuaRetencion,
+                _objetivo("dahua_retencion", retencion_contratada_dias=25),
+            )
+        )
+    assert (r[CAM_1].estado, r[CAM_1].codigo) == (Estado.DEGRADADO, "sin_grabacion_reciente")
+    assert r[CAM_1].metricas["retencion_real_dias"] == 29.8  # el dato se conserva
+
+
+async def test_firmware_que_ignora_el_filtro_de_canal():
+    with respx.mock() as mock:
+        _mock_retencion(mock, desfase_canal=1)  # responde el canal equivocado
+        r = _por_dispositivo(await _correr(AdaptadorDahuaRetencion, _objetivo("dahua_retencion")))
+    assert (r[CAM_1].estado, r[CAM_1].codigo) == (
+        Estado.DESCONOCIDO,
+        "busqueda_canal_inconsistente",
+    )
+
+
+def test_respuesta_real_de_busqueda_nvr5432():
+    texto = _leer("dahua_nvr/dhi-nvr5432-ei_fw5.001/findNextFile_canal3.txt").decode()
+    assert "items[0].Channel=2" in texto  # canal 3 pedido, numerado desde 0 en la respuesta

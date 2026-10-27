@@ -1,0 +1,14 @@
+found=1
+items[0].Channel=2
+items[0].Cluster=4183
+items[0].CutLength=5242880
+items[0].Disk=0
+items[0].EndTime=2026-06-29 10:22:20
+items[0].FilePath=/mnt/dvr/2026-06-29/2/dav/10/0/0/4183/10.20.41-10.22.20[R][0@0][0].dav
+items[0].Flags[0]=Timing
+items[0].Flags[1]=UnMarked
+items[0].Length=5242880
+items[0].Partition=0
+items[0].StartTime=2026-06-29 10:20:41
+items[0].Type=dav
+items[0].VideoStream=Main

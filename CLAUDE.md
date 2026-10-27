@@ -118,7 +118,7 @@ IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "
 | `dahua_acceso` / `dahua_camara` | Controladoras y cámaras Dahua (CGI) | Modelo, firmware, serie, reloj | Validar con equipo real |
 | `dahua_nvr` | NVR Dahua (de sistema, con `canales`) | Identidad, discos, uso, cámara conectada por canal | ✅ Validado en oficina con `idcmd_monitor`: DHI-NVR5432-EI, fw 5.001 (2026-03-31), http |
 | `dahua_registro` / `hikvision_registro` | Registro de operaciones (ADR 0009) | Quién entró (cuenta, IP) y qué hizo; descarta eventos (IVS, audio, alarmas) | Dahua ✅ oficina (NVR5432, fw 5.001): IP en `Detail`, login en 2 entradas, textos en español. Hikvision: validar |
-| `dahua_retencion` | NVR Dahua (`deteccion: false`, cada 15 min) | Retención real y proyectada por cámara vs contratada | ✅ Validado en oficina: 120,2 reales / 227,1 proyectados (falta confirmar el filtro por canal) |
+| `dahua_retencion` | NVR Dahua (`deteccion: false`, cada 15 min) | Retención real y proyectada por cámara vs contratada; grabación reciente por canal | ✅ Validado en oficina: 120,3 reales / 226,6 proyectados; el filtro por canal funciona (respuesta numerada desde 0) |
 | `simulado` | Demos | Caídas ficticias reproducibles | — |
 
 Para validar uno contra un equipo real: `idcmd sondear --adaptador <nombre> --direccion <ip>

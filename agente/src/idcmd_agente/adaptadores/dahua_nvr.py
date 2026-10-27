@@ -7,6 +7,9 @@
 
 `dahua_retencion` (cada 15 min, `deteccion: false`):
     * por canal: fecha de la grabación más antigua -> días reales de retención;
+    * por canal: si hay grabación en las últimas `ventana_grabacion_reciente_h` horas. La más
+      antigua sola no basta: en la oficina el canal 3 tenía archivos de junio de una cámara
+      anterior y "120 días" aunque llevaba semanas sin grabar (2026-10-27);
     * retención proyectada (días reales / fracción de disco usada) mientras el disco no se
       llena, y comparación con `retencion_contratada_dias` (ver juzgar_retencion).
 
@@ -19,6 +22,8 @@ Parámetros:
     retencion_contratada_dias
     almacenamiento_esperado_gb  capacidad instalada; si baja más de 5 % -> capacidad_reducida
     umbral_uso_disco_pct    solo para NVR SIN sobrescritura: alerta de disco casi lleno
+    ventana_grabacion_reciente_h  2 por defecto; con grabación solo por movimiento, subirla
+                            (un pasillo sin movimiento de noche no es una falla)
     esquema, verificar_tls, umbral_desfase_s, zona_horaria_equipo   como en dahua_acceso
 
 PENDIENTE DE VALIDAR con el NVR de la oficina: formatos de getDeviceAllInfo,
@@ -29,7 +34,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import ClassVar
 from zoneinfo import ZoneInfo
@@ -319,12 +324,24 @@ class AdaptadorDahuaRetencion(_BaseNvr):
         cliente = crear_cliente(
             objetivo, credencial, OPS_RETENCION, self._cliente_http, self._capturar_en
         )
+        base = int(p.get("canal_base", 1))
+        ventana_reciente = timedelta(hours=float(p.get("ventana_grabacion_reciente_h", 2)))
         salida = []
         try:
             uso = await self._uso_disco(cliente)
             for canal, camara in sorted(objetivo.canales.items()):
                 try:
-                    inicio = await self._grabacion_mas_antigua(cliente, canal, ahora, zona)
+                    inicio = await self._primera_grabacion(
+                        cliente,
+                        canal,
+                        base,
+                        datetime(2000, 1, 1, tzinfo=ZoneInfo(zona)),
+                        ahora,
+                        zona,
+                    )
+                    reciente = inicio and await self._primera_grabacion(
+                        cliente, canal, base, ahora - ventana_reciente, ahora, zona
+                    )
                 except ErrorDahua as e:
                     if e.codigo in CODIGOS_ACCESO:
                         raise
@@ -339,6 +356,10 @@ class AdaptadorDahuaRetencion(_BaseNvr):
                     continue
                 dias = round((ahora - inicio).total_seconds() / 86400, 1)
                 estado, codigo, metricas = juzgar_retencion(dias, uso, contratada)
+                if reciente is None:
+                    # Hay video viejo pero no nuevo: la cámara dejó de grabar. Pesa más que
+                    # cualquier juicio de retención.
+                    estado, codigo = Estado.DEGRADADO, "sin_grabacion_reciente"
                 salida.append(resultado(camara, estado, codigo, **metricas))
         except ErrorDahua as e:
             # Sin acceso al equipo: se informa para todas las cámaras y no se insiste.
@@ -368,17 +389,29 @@ class AdaptadorDahuaRetencion(_BaseNvr):
         return 100 * sum(d["usado"] for d in discos) / total if total else None
 
     @staticmethod
-    async def _grabacion_mas_antigua(
-        cliente: ClienteSoloLectura, canal: int, ahora: datetime, zona: str
+    async def _primera_grabacion(
+        cliente: ClienteSoloLectura,
+        canal: int,
+        base: int,
+        desde: datetime,
+        hasta: datetime,
+        zona: str,
     ) -> datetime | None:
+        """Inicio del primer archivo del canal entre `desde` y `hasta`, o None si no hay.
+
+        La búsqueda se pide con el canal numerado desde 1 y el NVR responde numerado desde 0
+        (`items[0].Channel=2` para el canal 3, NVR5432 fw 5.001). Si el canal de la respuesta
+        no es el pedido, el firmware ignoró el filtro: mejor no informar que informar la
+        retención de otra cámara.
+        """
         ruta = "/cgi-bin/mediaFileFind.cgi"
         r = await cliente.solicitar("GET", ruta, params={"action": "factory.create"})
         verificar_acceso(r)
         objeto = clave_valor(r.text).get("result")
         if r.status_code != 200 or not objeto or not objeto.isdigit():
             raise ErrorDahua(Estado.DESCONOCIDO, "busqueda_no_soportada")
+        local = ZoneInfo(zona)
         try:
-            hasta = ahora.astimezone(ZoneInfo(zona)).strftime(FORMATO_FECHA)
             r = await cliente.solicitar(
                 "GET",
                 ruta,
@@ -386,12 +419,15 @@ class AdaptadorDahuaRetencion(_BaseNvr):
                     "action": "findFile",
                     "object": objeto,
                     "condition.Channel": str(canal),
-                    "condition.StartTime": "2000-01-01 00:00:00",
-                    "condition.EndTime": hasta,
+                    "condition.StartTime": desde.astimezone(local).strftime(FORMATO_FECHA),
+                    "condition.EndTime": hasta.astimezone(local).strftime(FORMATO_FECHA),
                     "condition.Types[0]": "dav",
                 },
             )
             if r.status_code != 200:
+                # Sin archivos en el rango, algunos firmwares responden error en findFile.
+                if desde.year > 2000:
+                    return None
                 raise ErrorDahua(Estado.DESCONOCIDO, "busqueda_no_soportada")
             r = await cliente.solicitar(
                 "GET", ruta, params={"action": "findNextFile", "object": objeto, "count": "1"}
@@ -399,6 +435,9 @@ class AdaptadorDahuaRetencion(_BaseNvr):
             datos = clave_valor(r.text) if r.status_code == 200 else {}
             if datos.get("found", "0") in ("0", ""):
                 return None
+            canal_respuesta = datos.get("items[0].Channel", "")
+            if canal_respuesta.isdigit() and int(canal_respuesta) != canal - base:
+                raise ErrorDahua(Estado.DESCONOCIDO, "busqueda_canal_inconsistente")
             texto = datos.get("items[0].StartTime")
             return hora_local_a_utc(texto, zona) if texto else None
         finally:
