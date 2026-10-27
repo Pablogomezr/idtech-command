@@ -34,7 +34,9 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
 - Retención real: 119,9 días en los canales 1, 2 y 5. El disco no está lleno, así que hoy la
   retención es la antigüedad de la grabación, no un límite. Pendiente: confirmar con la
   captura que la búsqueda respeta el canal (los tres dieron el mismo valor).
-- Pendiente: saber si los canales 3 y 4 tienen cámara (posible primera falla real detectada).
+- Canales 3 y 4 sin cámara: el NVR informa los canales vacíos igual que una cámara
+  desconectada. Regla: solo se vigilan los canales declarados en el inventario (`canales`);
+  el inventario de cada sitio debe listar exactamente los canales con cámara.
 
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.
