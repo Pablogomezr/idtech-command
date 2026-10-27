@@ -81,7 +81,7 @@ async def test_marca_nueva_funciona_sin_tocar_el_nucleo(tmp_path, dispositivo):
         eventos = await plan.chequear(objetivo)
     assert [e.estado_nuevo for e in eventos] == [Estado.CAIDO]
     assert despertares == [1]
-    assert buzon.pendientes() == 1
+    assert [i.tipo for i in buzon.tomar_lote(10)].count("evento") == 1
 
 
 async def test_credencial_faltante_da_desconocido(tmp_path, dispositivo):

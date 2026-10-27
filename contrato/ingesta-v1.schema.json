@@ -148,6 +148,48 @@
       "title": "EventoEstado",
       "type": "object"
     },
+    "Instantanea": {
+      "additionalProperties": false,
+      "description": "Métricas vigentes de un chequeo. El agente la envía cuando cambia una métrica no\nvolátil y al menos una vez por hora; la central guarda el valor actual y el historial de\ncambios (p. ej. usuarios registrados en un panel o modo de verificación de una lectora).",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "dispositivo_id": {
+          "format": "uuid",
+          "title": "Dispositivo Id",
+          "type": "string"
+        },
+        "chequeo": {
+          "title": "Chequeo",
+          "type": "string"
+        },
+        "estado": {
+          "$ref": "#/$defs/Estado"
+        },
+        "observado_at": {
+          "format": "date-time",
+          "title": "Observado At",
+          "type": "string"
+        },
+        "metricas": {
+          "additionalProperties": true,
+          "title": "Metricas",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "dispositivo_id",
+        "chequeo",
+        "estado",
+        "observado_at"
+      ],
+      "title": "Instantanea",
+      "type": "object"
+    },
     "Latido": {
       "additionalProperties": false,
       "properties": {
@@ -223,6 +265,13 @@
         "$ref": "#/$defs/AgregadoHora"
       },
       "title": "Agregados",
+      "type": "array"
+    },
+    "instantaneas": {
+      "items": {
+        "$ref": "#/$defs/Instantanea"
+      },
+      "title": "Instantaneas",
       "type": "array"
     }
   },

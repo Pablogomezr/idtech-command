@@ -168,7 +168,15 @@ class _ConCredencial:
 # --- Retención real --------------------------------------------------------------------------
 
 
-def _mock_retencion(mock, siguiente=None, crear_status=200):
+DISCO_LLENO = _leer("dahua_nvr/getDeviceAllInfo.txt").replace(
+    b"UsedBytes=3760000000000", b"UsedBytes=3990000000000"
+)  # 99,8 %: sobrescribiendo
+
+
+def _mock_retencion(mock, siguiente=None, crear_status=200, discos=DISCO_LLENO):
+    mock.get(f"{BASE}/cgi-bin/storageDevice.cgi", params={"action": "getDeviceAllInfo"}).respond(
+        200, content=discos
+    )
     ruta = f"{BASE}/cgi-bin/mediaFileFind.cgi"
     mock.get(ruta, params={"action": "factory.create"}).respond(
         crear_status, content=_leer("dahua_nvr/factory_create.txt")
@@ -312,3 +320,79 @@ def test_sondear_con_carpeta_de_captura_no_escribible(capsys, tmp_path):
     )
     assert codigo == 2
     assert "no se puede escribir" in capsys.readouterr().err
+
+
+# --- Alertas de almacenamiento del NVR (pedido de Pablo) ------------------------------------
+
+
+def test_nvr_reporta_capacidad_y_espacio_libre():
+    from idcmd_agente.adaptadores.dahua_nvr import evaluar_almacenamiento, interpretar_discos
+
+    metricas = {}
+    discos = interpretar_discos(_leer("dahua_nvr/getDeviceAllInfo.txt").decode())
+    assert evaluar_almacenamiento(discos, {}, metricas) == []
+    assert metricas["almacenamiento_total_gb"] == 4000
+    assert metricas["almacenamiento_libre_gb"] == 240
+    assert metricas["discos_total"] == 1
+
+
+def test_nvr_lleno_no_es_falla_por_defecto():
+    from idcmd_agente.adaptadores.dahua_nvr import evaluar_almacenamiento, interpretar_discos
+
+    discos = interpretar_discos(DISCO_LLENO.decode())
+    assert evaluar_almacenamiento(discos, {}, {}) == []  # sobrescribe: es lo normal
+
+
+@pytest.mark.parametrize(
+    ("parametros", "hallazgo"),
+    [
+        ({"umbral_uso_disco_pct": 90}, "disco_casi_lleno"),  # NVR sin sobrescritura
+        ({"almacenamiento_esperado_gb": 8000}, "capacidad_reducida"),  # falta un disco
+    ],
+)
+def test_alertas_de_almacenamiento(parametros, hallazgo):
+    from idcmd_agente.adaptadores.dahua_nvr import evaluar_almacenamiento, interpretar_discos
+
+    discos = interpretar_discos(_leer("dahua_nvr/getDeviceAllInfo.txt").decode())
+    assert evaluar_almacenamiento(discos, parametros, {}) == [hallazgo]
+
+
+async def test_capacidad_reducida_en_el_resultado_del_nvr():
+    with respx.mock() as mock:
+        _mock_nvr(mock)
+        r = _por_dispositivo(
+            await _correr(AdaptadorDahuaNvr, _objetivo(almacenamiento_esperado_gb=8000))
+        )
+    assert (r[NVR].estado, r[NVR].codigo) == (Estado.DEGRADADO, "capacidad_reducida")
+
+
+@pytest.mark.parametrize(
+    ("dias", "uso", "contratada", "codigo", "proyectada"),
+    [
+        (119.9, 52.7, 30, None, 227.5),  # la oficina: sobra capacidad
+        (10.0, 20.0, 30, None, 50.0),  # NVR nuevo: pocos días reales, no es falla
+        (10.0, 50.0, 30, "retencion_proyectada_insuficiente", 20.0),  # se quedará corto
+        (25.0, 99.0, 30, "retencion_insuficiente", None),  # lleno y por debajo: falla real
+        (40.0, 99.0, 30, None, None),
+        (25.0, None, 30, "retencion_insuficiente", None),  # sin dato de uso: se usa la real
+    ],
+)
+def test_juzgar_retencion(dias, uso, contratada, codigo, proyectada):
+    from idcmd_agente.adaptadores.dahua_nvr import juzgar_retencion
+
+    _, cod, metricas = juzgar_retencion(dias, uso, contratada)
+    assert cod == codigo
+    assert metricas.get("retencion_proyectada_dias") == proyectada
+
+
+async def test_retencion_proyectada_en_disco_a_medio_llenar():
+    with respx.mock() as mock:
+        _mock_retencion(mock, discos=_leer("dahua_nvr/getDeviceAllInfo.txt"))  # 94 %
+        r = _por_dispositivo(
+            await _correr(
+                AdaptadorDahuaRetencion,
+                _objetivo("dahua_retencion", retencion_contratada_dias=30),
+            )
+        )
+    # 29,8 días reales al 94 % -> 31,7 proyectados: cumple los 30 contratados.
+    assert (r[CAM_1].estado, r[CAM_1].metricas["retencion_proyectada_dias"]) == (Estado.OK, 31.7)

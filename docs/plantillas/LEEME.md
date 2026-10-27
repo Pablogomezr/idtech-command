@@ -19,5 +19,6 @@ Las filas incluidas son ejemplos para mostrar el formato; reemplácelas con su e
 Códigos que el agente emite hoy: `sin_respuesta_icmp`, `perdida_paquetes`, `sin_respuesta_http`,
 `credencial_rechazada`, `credencial_requerida`, `tamper_activo`, `lectora_desconectada`,
 `bateria_baja`, `reloj_desfasado`, `disco_con_error`, `sin_disco`, `camara_desconectada_nvr`,
-`sin_grabaciones`, `busqueda_no_soportada`, `zona_horaria_incorrecta`,
+`sin_grabaciones`, `busqueda_no_soportada`, `zona_horaria_incorrecta`, `capacidad_reducida`,
+`disco_casi_lleno`, `retencion_proyectada_insuficiente`,
 `retencion_insuficiente`, `credencial_no_encontrada`, `tiempo_agotado`, `error_adaptador`.

@@ -6,8 +6,9 @@
     * por canal: si el NVR ve la cámara conectada (resultado a nombre de la cámara).
 
 `dahua_retencion` (cada 15 min, `deteccion: false`):
-    * por canal: fecha de la grabación más antigua -> días reales de retención, y
-      comparación con `retencion_contratada_dias` si se indica.
+    * por canal: fecha de la grabación más antigua -> días reales de retención;
+    * retención proyectada (días reales / fracción de disco usada) mientras el disco no se
+      llena, y comparación con `retencion_contratada_dias` (ver juzgar_retencion).
 
 Ambos son "de sistema": el objetivo trae `canales: {canal: dispositivo_id_de_la_camara}`.
 Solo leen: nada de video en vivo, reproducción, descarga ni configuración. En particular no
@@ -16,6 +17,8 @@ usan `configManager.cgi` (RemoteDevice devuelve las contraseñas de las cámaras
 Parámetros:
     canal_base              numeración de canales del NVR en la API (1 por defecto)
     retencion_contratada_dias
+    almacenamiento_esperado_gb  capacidad instalada; si baja más de 5 % -> capacidad_reducida
+    umbral_uso_disco_pct    solo para NVR SIN sobrescritura: alerta de disco casi lleno
     esquema, verificar_tls, umbral_desfase_s, zona_horaria_equipo   como en dahua_acceso
 
 PENDIENTE DE VALIDAR con el NVR de la oficina: formatos de getDeviceAllInfo,
@@ -56,6 +59,7 @@ OPS_NVR = [
 
 _OBJETO = r"\d{1,12}"
 OPS_RETENCION = [
+    Operacion("GET", r"/cgi-bin/storageDevice\.cgi", {"action": r"getDeviceAllInfo"}),
     Operacion("GET", r"/cgi-bin/mediaFileFind\.cgi", {"action": r"factory\.create"}),
     Operacion(
         "GET",
@@ -106,6 +110,50 @@ def interpretar_discos(texto: str) -> list[dict]:
         if (d["estado"] or "").lower() in _ESTADOS_ERROR:
             d["error"] = True
     return [discos[i] for i in sorted(discos)]
+
+
+ORDEN_HALLAZGOS_NVR = [
+    "disco_con_error",
+    "sin_disco",
+    "capacidad_reducida",
+    "disco_casi_lleno",
+    "reloj_desfasado",
+]
+LLENO_PCT = 97  # desde aquí el NVR está sobrescribiendo: la retención real es su techo
+
+
+def evaluar_almacenamiento(discos: list[dict], p: dict, metricas: dict) -> list[str]:
+    """Completa las métricas de almacenamiento y devuelve los hallazgos.
+
+    Un NVR al 100 % NO es una falla: lo normal es que sobrescriba lo más antiguo. Las
+    alertas son: disco con error, sin disco, capacidad menor a la instalada (se retiró o
+    se murió un disco) y, solo si se configura `umbral_uso_disco_pct` (NVR sin
+    sobrescritura), disco casi lleno.
+    """
+    hallazgos: list[str] = []
+    total = sum(d["total"] for d in discos)
+    usado = sum(d["usado"] for d in discos)
+    metricas["discos_total"] = len(discos)
+    metricas["discos_con_error"] = sum(d["error"] for d in discos)
+    if total:
+        metricas["almacenamiento_uso_pct"] = round(100 * usado / total, 1)
+        metricas["almacenamiento_total_gb"] = round(total / 1e9)
+        metricas["almacenamiento_libre_gb"] = round((total - usado) / 1e9)
+    if not discos:
+        metricas["hdd_estado"] = "sin_disco"
+        hallazgos.append("sin_disco")
+    elif metricas["discos_con_error"]:
+        metricas["hdd_estado"] = "error"
+        hallazgos.append("disco_con_error")
+    else:
+        metricas["hdd_estado"] = "normal"
+    esperado = p.get("almacenamiento_esperado_gb")
+    if esperado is not None and total / 1e9 < 0.95 * float(esperado):
+        hallazgos.append("capacidad_reducida")
+    umbral = p.get("umbral_uso_disco_pct")
+    if umbral is not None and total and 100 * usado / total >= float(umbral):
+        hallazgos.append("disco_casi_lleno")
+    return hallazgos
 
 
 class _BaseNvr:
@@ -168,22 +216,10 @@ class AdaptadorDahuaNvr(_BaseNvr):
                 await cliente.cerrar()
 
         if r_discos.status_code == 200:
-            discos = interpretar_discos(r_discos.text)
-            con_error = sum(d["error"] for d in discos)
-            total = sum(d["total"] for d in discos)
-            metricas["discos_con_error"] = con_error
-            if total:
-                metricas["almacenamiento_uso_pct"] = round(
-                    100 * sum(d["usado"] for d in discos) / total, 1
-                )
-            if not discos:
-                metricas["hdd_estado"] = "sin_disco"
-                hallazgos.insert(0, "sin_disco")
-            elif con_error:
-                metricas["hdd_estado"] = "error"
-                hallazgos.insert(0, "disco_con_error")
-            else:
-                metricas["hdd_estado"] = "normal"
+            hallazgos += evaluar_almacenamiento(
+                interpretar_discos(r_discos.text), objetivo.parametros, metricas
+            )
+        hallazgos.sort(key=ORDEN_HALLAZGOS_NVR.index)
 
         resultados = [
             resultado(nvr, "dahua_nvr", Estado.DEGRADADO, hallazgos[0], **metricas)
@@ -220,6 +256,30 @@ class AdaptadorDahuaNvr(_BaseNvr):
         return salida
 
 
+def juzgar_retencion(
+    dias: float, uso_pct: float | None, contratada: object
+) -> tuple[Estado, str | None, dict]:
+    """Retención real y proyectada frente a la contratada.
+
+    Mientras el disco no está lleno, la retención real es solo la antigüedad de la
+    grabación (un NVR nuevo tiene pocos días y eso no es una falla): se juzga con la
+    PROYECTADA = días reales / fracción de disco usada. Con el disco lleno (sobrescribiendo)
+    la real es el techo y se juzga con ella. Si no se conoce el uso, se juzga con la real.
+    """
+    metricas: dict = {"retencion_real_dias": dias}
+    lleno = uso_pct is None or uso_pct >= LLENO_PCT
+    if not lleno and uso_pct > 0:
+        metricas["retencion_proyectada_dias"] = round(dias / (uso_pct / 100), 1)
+    if contratada is None:
+        return Estado.OK, None, metricas
+    if lleno and dias < float(contratada):
+        return Estado.DEGRADADO, "retencion_insuficiente", metricas
+    proyectada = metricas.get("retencion_proyectada_dias")
+    if proyectada is not None and proyectada < float(contratada):
+        return Estado.DEGRADADO, "retencion_proyectada_insuficiente", metricas
+    return Estado.OK, None, metricas
+
+
 @registrar("dahua_retencion")
 class AdaptadorDahuaRetencion(_BaseNvr):
     capacidades = frozenset({"retencion"})
@@ -252,6 +312,7 @@ class AdaptadorDahuaRetencion(_BaseNvr):
         )
         salida = []
         try:
+            uso = await self._uso_disco(cliente)
             for canal, camara in sorted(objetivo.canales.items()):
                 try:
                     inicio = await self._grabacion_mas_antigua(cliente, canal, ahora, zona)
@@ -266,17 +327,8 @@ class AdaptadorDahuaRetencion(_BaseNvr):
                     )
                     continue
                 dias = round((ahora - inicio).total_seconds() / 86400, 1)
-                if contratada is not None and dias < float(contratada):
-                    salida.append(
-                        resultado(
-                            camara,
-                            Estado.DEGRADADO,
-                            "retencion_insuficiente",
-                            retencion_real_dias=dias,
-                        )
-                    )
-                else:
-                    salida.append(resultado(camara, Estado.OK, retencion_real_dias=dias))
+                estado, codigo, metricas = juzgar_retencion(dias, uso, contratada)
+                salida.append(resultado(camara, estado, codigo, **metricas))
         except httpx.TransportError:
             return [
                 resultado(c, Estado.DESCONOCIDO, "sin_respuesta_http")
@@ -286,6 +338,17 @@ class AdaptadorDahuaRetencion(_BaseNvr):
             if self._cliente_http is None:
                 await cliente.cerrar()
         return salida
+
+    @staticmethod
+    async def _uso_disco(cliente: ClienteSoloLectura) -> float | None:
+        r = await cliente.solicitar(
+            "GET", "/cgi-bin/storageDevice.cgi", params={"action": "getDeviceAllInfo"}
+        )
+        if r.status_code != 200:
+            return None
+        discos = interpretar_discos(r.text)
+        total = sum(d["total"] for d in discos)
+        return 100 * sum(d["usado"] for d in discos) / total if total else None
 
     @staticmethod
     async def _grabacion_mas_antigua(

@@ -52,10 +52,33 @@ METRICAS_PERMITIDAS: dict[str, tuple[type, ...]] = {
     # Almacenamiento de NVR/DVR.
     "discos_con_error": (int,),
     "almacenamiento_uso_pct": (int, float),
+    "almacenamiento_total_gb": (int,),
+    "almacenamiento_libre_gb": (int,),
+    "discos_total": (int,),
+    "retencion_proyectada_dias": (int, float),
+    # Control de acceso: solo TOTALES y configuración de seguridad, nunca datos de personas
+    # (ADR 0008).
+    "usuarios_registrados": (int,),
+    "tarjetas_registradas": (int,),
+    "modos_verificacion": (str,),  # "direccion:codigo,..." p. ej. "1:7,3:3"
 }
 
+# Mediciones que varían en cada chequeo: no cuentan como "cambio" para el historial de
+# configuración (sí se actualizan en el valor actual).
+METRICAS_VOLATILES = frozenset(
+    {
+        "latencia_ms",
+        "perdida_pct",
+        "desfase_reloj_s",
+        "retencion_real_dias",
+        "retencion_proyectada_dias",
+        "almacenamiento_uso_pct",
+        "almacenamiento_libre_gb",
+    }
+)
+
 PATRON_CODIGO = re.compile(r"^[a-z0-9_]{1,64}$")
-_PATRON_TEXTO_METRICA = re.compile(r"^[\w .\-+()/]{1,64}$")
+_PATRON_TEXTO_METRICA = re.compile(r"^[\w .\-+()/:,]{1,64}$")
 
 
 def ahora_utc() -> datetime:
@@ -211,6 +234,35 @@ class Latido(_Estricto):
         return _a_utc(v)
 
 
+class Instantanea(_Estricto):
+    """Métricas vigentes de un chequeo. El agente la envía cuando cambia una métrica no
+    volátil y al menos una vez por hora; la central guarda el valor actual y el historial de
+    cambios (p. ej. usuarios registrados en un panel o modo de verificación de una lectora).
+    """
+
+    id: uuid.UUID
+    dispositivo_id: uuid.UUID
+    chequeo: str
+    estado: Estado
+    observado_at: datetime
+    metricas: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("chequeo")
+    @classmethod
+    def validar_chequeo(cls, v: str) -> str:
+        return validar_codigo(v)
+
+    @field_validator("metricas")
+    @classmethod
+    def validar_vocabulario(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return validar_metricas(v)
+
+    @field_validator("observado_at")
+    @classmethod
+    def validar_fecha(cls, v: datetime) -> datetime:
+        return _a_utc(v)
+
+
 class LoteIngesta(_Estricto):
     """Cuerpo de POST /api/v1/ingesta (gzip). Contrato v1."""
 
@@ -220,6 +272,7 @@ class LoteIngesta(_Estricto):
     latido: Latido
     eventos: list[EventoEstado] = Field(default_factory=list)
     agregados: list[AgregadoHora] = Field(default_factory=list)
+    instantaneas: list[Instantanea] = Field(default_factory=list)
 
     @field_validator("enviado_at")
     @classmethod

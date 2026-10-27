@@ -76,5 +76,6 @@ async def recibir_lote(request: Request) -> dict:
     return {
         "aceptados": resultado.aceptados,
         "rechazados": resultado.rechazados,
+        "cambios": resultado.cambios,
         "comandos": [],  # reservado para Fase 2 (reinicio remoto firmado)
     }

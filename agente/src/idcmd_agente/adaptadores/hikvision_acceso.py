@@ -1,9 +1,10 @@
 """Paneles y terminales de control de acceso Hikvision por ISAPI (DS-K26xx, DS-K1Txxx).
 
-Solo lee la SALUD del panel: modelo, firmware, número de serie, reloj, tamper de la caja,
-lectoras en línea y batería. Nunca consulta eventos de acceso (marcaciones), usuarios,
-tarjetas ni rostros, y nunca abre puertas ni reinicia: esas rutas no están en la lista
-blanca y una prueba lo verifica.
+Lee la SALUD del panel (modelo, firmware, número de serie, reloj y zona horaria, tamper,
+lectoras en línea, batería) y, desde el ADR 0008, TOTALES de usuarios y tarjetas y el modo
+de verificación de cada lectora. Nunca consulta eventos de acceso (marcaciones) ni datos de
+una persona (UserInfo/Search, CardInfo, rostros), y nunca abre puertas ni reinicia: esas
+rutas no están en la lista blanca y una prueba lo verifica.
 
 Parámetros del objetivo:
     esquema               "http" (por defecto) o "https"
@@ -45,7 +46,41 @@ OPERACIONES = [
     Operacion("GET", r"/ISAPI/System/deviceInfo"),
     Operacion("GET", r"/ISAPI/System/time"),
     Operacion("GET", r"/ISAPI/AccessControl/AcsWorkStatus", {"format": "json"}),
+    # Solo el TOTAL de usuarios (ADR 0008). UserInfo/Search, que lista personas, no está.
+    Operacion("GET", r"/ISAPI/AccessControl/UserInfo/Count", {"format": "json"}),
 ]
+
+# Códigos de `cardReaderVerifyMode` (tabla de Hikvision; 3 y 7 por confirmar en la oficina).
+# El agente envía el código; la central muestra el texto.
+MODOS_VERIFICACION = {
+    1: "inactiva",
+    2: "tarjeta + clave",
+    3: "tarjeta",
+    4: "tarjeta o clave",
+    5: "huella",
+    6: "huella + clave",
+    7: "huella o tarjeta",
+    8: "huella + tarjeta",
+    9: "huella + tarjeta + clave",
+    10: "rostro, huella, tarjeta o clave",
+    11: "rostro + huella",
+    12: "rostro + clave",
+    13: "rostro + tarjeta",
+    14: "rostro",
+    15: "ID de empleado + clave",
+    16: "huella o clave",
+    17: "ID de empleado + huella",
+    18: "ID de empleado + huella + clave",
+    19: "rostro + huella + tarjeta",
+    20: "rostro + clave + huella",
+    21: "ID de empleado + rostro",
+    22: "rostro o rostro + tarjeta",
+    23: "huella o rostro",
+    24: "tarjeta, rostro o clave",
+    25: "tarjeta o rostro",
+    26: "tarjeta, rostro o huella",
+    27: "tarjeta, huella o clave",
+}
 
 
 def _xml(texto: bytes) -> dict[str, str]:
@@ -76,6 +111,20 @@ def lectoras_faltantes(
     total = int(esperadas) if esperadas is not None else len(str(direcciones).split(","))
     conectadas = sum(1 for x in en_linea if x == 1) if por_puerto else len(en_linea)
     return max(0, total - conectadas)
+
+
+def modos_verificacion(modos: object, direcciones: object = None) -> str | None:
+    """[7, 3, 3, 3] -> "1:7,2:3,3:3,4:3" (posición = dirección de la lectora).
+
+    Con `lectoras_direcciones` ("1,3") se informan solo las lectoras instaladas: "1:7,3:3".
+    """
+    if not isinstance(modos, list) or not all(isinstance(m, int) for m in modos):
+        return None
+    pares = list(enumerate(modos, start=1))
+    if direcciones is not None:
+        instaladas = {int(d) for d in str(direcciones).replace(" ", "").split(",") if d}
+        pares = [(d, m) for d, m in pares if d in instaladas]
+    return ",".join(f"{d}:{m}" for d, m in pares)[:64] or None
 
 
 @registrar("hikvision_acceso")
@@ -131,6 +180,9 @@ class AdaptadorHikvisionAcceso:
             r_estado = await cliente.solicitar(
                 "GET", "/ISAPI/AccessControl/AcsWorkStatus", params={"format": "json"}
             )
+            r_usuarios = await cliente.solicitar(
+                "GET", "/ISAPI/AccessControl/UserInfo/Count", params={"format": "json"}
+            )
         except httpx.TransportError:
             return [resultado(Estado.CAIDO, "sin_respuesta_http")]
         finally:
@@ -184,6 +236,17 @@ class AdaptadorHikvisionAcceso:
                 metricas["lectoras_desconectadas"] = faltantes
                 if faltantes:
                     hallazgos.append("lectora_desconectada")
+            if isinstance(estado_acs.get("cardNum"), int):
+                metricas["tarjetas_registradas"] = estado_acs["cardNum"]
+            modos = modos_verificacion(
+                estado_acs.get("cardReaderVerifyMode"), p.get("lectoras_direcciones")
+            )
+            if modos:
+                metricas["modos_verificacion"] = modos
+
+        usuarios = self._total_usuarios(r_usuarios)
+        if usuarios is not None:
+            metricas["usuarios_registrados"] = usuarios
 
         if hallazgos:
             # Un solo código por resultado: el más grave según este orden.
@@ -224,6 +287,16 @@ class AdaptadorHikvisionAcceso:
         zona_esperada_h = local_esperada.utcoffset().total_seconds() / 3600
         zona_h = zona.total_seconds() / 3600 if zona is not None else None
         return desfase, zona_h, zona_esperada_h, datos.get("timeMode", "").upper() == "NTP"
+
+    @staticmethod
+    def _total_usuarios(respuesta: httpx.Response) -> int | None:
+        if respuesta.status_code != 200:
+            return None
+        try:
+            total = respuesta.json().get("UserInfoCount", {}).get("userNumber")
+        except (ValueError, AttributeError):
+            return None
+        return total if isinstance(total, int) else None
 
     @staticmethod
     def _estado_acceso(respuesta: httpx.Response) -> dict | None:

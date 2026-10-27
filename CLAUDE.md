@@ -23,7 +23,9 @@ dependencias, código aburrido y probado.
 4. **Datos en Colombia**: central en Oracle Cloud región Bogotá, incluidos archivos y
    respaldos. No usar nubes de fabricantes (p. ej. DoLynk/Dahua) como fuente de datos.
 5. **Minimización**: correos, Telegram y web push llevan solo nombre del equipo, sitio,
-   estado y un enlace. Nunca IPs ni detalles técnicos. Nada de eventos de acceso/marcaciones.
+   estado y un enlace. Nunca IPs ni detalles técnicos. **Ni datos ni eventos de personas**
+   (marcaciones, listados de usuarios, tarjetas, rostros); sí **totales** (usuarios y
+   tarjetas registrados) y **configuración de seguridad** (modo de verificación). ADR 0008.
 6. **No se pierde ningún dato de estado**: todo pasa por el buzón SQLite antes de enviarse.
 
 ## Decisiones (ver `docs/adr/`)
@@ -37,6 +39,7 @@ dependencias, código aburrido y probado.
 | 0005 | Seguridad del agente: bóveda AES-256-GCM, guarda de secretos, contenedor endurecido. |
 | 0006 | Principio de solo lectura y la excepción del reinicio remoto (Fase 2). |
 | 0007 | Idioma: identificadores y documentación en español, sin tildes ni ñ en el código. |
+| 0008 | Totales de usuarios y configuración de seguridad permitidos; datos de personas no. |
 
 Supuestos aprobados por Pablo (P1–P10): `docs/supuestos.md`.
 
@@ -115,6 +118,11 @@ IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "
 Para validar uno contra un equipo real: `idcmd sondear --adaptador <nombre> --direccion <ip>
 --usuario <u> [--param clave=valor] [--capturar ./dir]`. Las capturas, revisadas y sin
 datos reales, reemplazan las respuestas armadas en `agente/tests/fixtures/`.
+
+Instantáneas: además de los eventos (cambio de estado), el agente envía las métricas
+vigentes cuando cambia una métrica no volátil y al menos cada hora (`nucleo/instantaneas.py`).
+La central guarda el valor actual y el historial de cambios (`cambios_metricas`): esa es la
+auditoría de configuración de los equipos. `METRICAS_VOLATILES` es igual en agente y central.
 
 Adaptadores "de sistema" (un NVR que informa por sus cámaras): el objetivo declara
 `canales: {canal: dispositivo_id}` y el planificador acepta resultados solo para esos

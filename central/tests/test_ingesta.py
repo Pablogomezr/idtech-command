@@ -64,7 +64,7 @@ async def test_lote_valido_registra_eventos_estado_y_latido(cliente, datos, duen
     lote = _lote(datos["agente_sitio_a1"], [_evento(camara)])
     r = await _enviar(cliente, datos.tokens["sitio_a1"], lote)
     assert r.status_code == 200
-    assert r.json() == {"aceptados": 1, "rechazados": 0, "comandos": []}
+    assert r.json() == {"aceptados": 1, "rechazados": 0, "cambios": 0, "comandos": []}
 
     estado, desde = dueno.execute(
         "SELECT estado, desde FROM idcmd.estado_actual WHERE dispositivo_id = %s", (camara,)

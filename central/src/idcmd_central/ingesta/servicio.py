@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from psycopg.types.json import Jsonb
 
-from ..contrato import LoteIngesta
+from ..contrato import METRICAS_VOLATILES, Instantanea, LoteIngesta
 from ..db import AgenteAutenticado, BaseDatos
 
 log = logging.getLogger(__name__)
@@ -23,10 +23,14 @@ class ResultadoIngesta:
     eventos_repetidos: int
     agregados_nuevos: int
     rechazados: int
+    instantaneas: int = 0
+    cambios: int = 0
 
     @property
     def aceptados(self) -> int:
-        return self.eventos_nuevos + self.eventos_repetidos + self.agregados_nuevos
+        return (
+            self.eventos_nuevos + self.eventos_repetidos + self.agregados_nuevos + self.instantaneas
+        )
 
 
 _INSERTAR_EVENTO = """
@@ -65,6 +69,64 @@ UPDATE idcmd.agentes
 """
 
 
+def _estables(metricas: dict) -> dict:
+    return {k: v for k, v in metricas.items() if k not in METRICAS_VOLATILES}
+
+
+async def _registrar_instantanea(con, a: AgenteAutenticado, inst: Instantanea) -> int:
+    """Actualiza el valor actual y, si cambió una métrica estable, registra el cambio.
+
+    Devuelve 1 si hubo cambio. Una instantánea más vieja que la vigente se ignora (llegó
+    tarde tras un corte), y reenviar la misma no duplica el cambio (id idempotente).
+    """
+    cur = await con.execute(
+        "SELECT metricas, observado_at FROM idcmd.metricas_actuales"
+        " WHERE dispositivo_id = %s AND chequeo = %s FOR UPDATE",
+        (inst.dispositivo_id, inst.chequeo),
+    )
+    vigente = await cur.fetchone()
+    if vigente is not None and vigente[1] >= inst.observado_at:
+        return 0
+    await con.execute(
+        "INSERT INTO idcmd.metricas_actuales (dispositivo_id, chequeo, cliente_id, sitio_id,"
+        " estado, metricas, observado_at) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        " ON CONFLICT (dispositivo_id, chequeo) DO UPDATE SET estado = excluded.estado,"
+        " metricas = excluded.metricas, observado_at = excluded.observado_at,"
+        " recibido_at = now()",
+        (
+            inst.dispositivo_id,
+            inst.chequeo,
+            a.cliente_id,
+            a.sitio_id,
+            inst.estado.value,
+            Jsonb(inst.metricas),
+            inst.observado_at,
+        ),
+    )
+    antes = _estables(vigente[0]) if vigente is not None else None
+    despues = _estables(inst.metricas)
+    if antes is None or antes == despues:
+        return 0  # primera lectura o sin cambios: no es un cambio de configuración
+    claves = {k for k in antes.keys() | despues.keys() if antes.get(k) != despues.get(k)}
+    cur = await con.execute(
+        "INSERT INTO idcmd.cambios_metricas (id, dispositivo_id, chequeo, cliente_id, sitio_id,"
+        " agente_id, observado_at, antes, despues) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        " ON CONFLICT (id) DO NOTHING RETURNING id",
+        (
+            inst.id,
+            inst.dispositivo_id,
+            inst.chequeo,
+            a.cliente_id,
+            a.sitio_id,
+            a.agente_id,
+            inst.observado_at,
+            Jsonb({k: antes.get(k) for k in claves}),
+            Jsonb({k: despues.get(k) for k in claves}),
+        ),
+    )
+    return int(await cur.fetchone() is not None)
+
+
 async def ingerir(bd: BaseDatos, agente: AgenteAutenticado, lote: LoteIngesta) -> ResultadoIngesta:
     a = agente
     async with bd.como_agente(a.agente_id) as con:
@@ -75,7 +137,9 @@ async def ingerir(bd: BaseDatos, agente: AgenteAutenticado, lote: LoteIngesta) -
 
         eventos = [e for e in lote.eventos if e.dispositivo_id in propios]
         agregados = [g for g in lote.agregados if g.dispositivo_id in propios]
-        rechazados = len(lote.eventos) + len(lote.agregados) - len(eventos) - len(agregados)
+        instantaneas = [i for i in lote.instantaneas if i.dispositivo_id in propios]
+        recibidos = len(lote.eventos) + len(lote.agregados) + len(lote.instantaneas)
+        rechazados = recibidos - len(eventos) - len(agregados) - len(instantaneas)
         if rechazados:
             # Inventario desalineado o agente mal configurado: se registra, no se reintenta.
             log.warning(
@@ -139,6 +203,10 @@ async def ingerir(bd: BaseDatos, agente: AgenteAutenticado, lote: LoteIngesta) -
             )
             agregados_nuevos += await cur.fetchone() is not None
 
+        cambios = 0
+        for inst in sorted(instantaneas, key=lambda i: i.observado_at):
+            cambios += await _registrar_instantanea(con, a, inst)
+
         latido = lote.latido
         await con.execute(
             _LATIDO,
@@ -155,5 +223,7 @@ async def ingerir(bd: BaseDatos, agente: AgenteAutenticado, lote: LoteIngesta) -
         eventos_nuevos=nuevos,
         eventos_repetidos=len(eventos) - nuevos,
         agregados_nuevos=agregados_nuevos,
+        instantaneas=len(instantaneas),
+        cambios=cambios,
         rechazados=rechazados,
     )

@@ -26,7 +26,15 @@ from urllib.parse import urlsplit
 import httpx
 
 from .buzon import Buzon
-from .modelos import AgregadoHora, EventoEstado, Latido, LoteIngesta, RespuestaIngesta, ahora_utc
+from .modelos import (
+    AgregadoHora,
+    EventoEstado,
+    Instantanea,
+    Latido,
+    LoteIngesta,
+    RespuestaIngesta,
+    ahora_utc,
+)
 
 log = logging.getLogger(__name__)
 
@@ -109,6 +117,11 @@ class Enviador:
                     AgregadoHora.model_validate_json(i.cuerpo)
                     for i in items
                     if i.tipo == "agregado"
+                ],
+                instantaneas=[
+                    Instantanea.model_validate_json(i.cuerpo)
+                    for i in items
+                    if i.tipo == "instantanea"
                 ],
             )
             await self._publicar(lote)

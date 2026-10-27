@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from .modelos import AgregadoHora, Estado, EventoEstado
+from .modelos import AgregadoHora, Estado, EventoEstado, Instantanea
 from .seguridad import GuardaSecretos
 
 RETENCION_ENVIADOS = timedelta(days=7)
@@ -36,7 +36,7 @@ _ESQUEMA = """
 CREATE TABLE IF NOT EXISTS salida (
     seq        INTEGER PRIMARY KEY AUTOINCREMENT,
     id         TEXT NOT NULL UNIQUE,
-    tipo       TEXT NOT NULL CHECK (tipo IN ('evento', 'agregado')),
+    tipo       TEXT NOT NULL CHECK (tipo IN ('evento', 'agregado', 'instantanea')),
     prioridad  INTEGER NOT NULL,
     cuerpo     TEXT NOT NULL,
     creado_at  TEXT NOT NULL,
@@ -101,6 +101,12 @@ class Buzon:
         with self._transaccion():
             self._insertar(str(agregado.id), "agregado", PRIORIDAD_AGREGADO, cuerpo, momento)
 
+    def encolar_instantanea(self, instantanea: Instantanea, momento: datetime) -> None:
+        cuerpo = instantanea.model_dump_json()
+        self._guarda.verificar(cuerpo)
+        with self._transaccion():
+            self._insertar(str(instantanea.id), "instantanea", PRIORIDAD_AGREGADO, cuerpo, momento)
+
     def _insertar(
         self, id_: str, tipo: str, prioridad: int, cuerpo: str, momento: datetime
     ) -> None:
@@ -149,7 +155,7 @@ class Buzon:
             if exceso > 0:
                 borrados += self._con.execute(
                     "DELETE FROM salida WHERE seq IN ("
-                    " SELECT seq FROM salida WHERE enviado_at IS NULL AND tipo = 'agregado'"
+                    " SELECT seq FROM salida WHERE enviado_at IS NULL AND tipo != 'evento'"
                     " ORDER BY seq LIMIT ?)",
                     (exceso,),
                 ).rowcount

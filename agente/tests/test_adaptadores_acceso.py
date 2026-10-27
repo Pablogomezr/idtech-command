@@ -54,6 +54,9 @@ def _mock_hikvision(mock, estado_acs=None, hora=None, info_status=200):
     mock.get(f"{BASE}/ISAPI/AccessControl/AcsWorkStatus", params={"format": "json"}).respond(
         200, json=acs
     )
+    mock.get(f"{BASE}/ISAPI/AccessControl/UserInfo/Count", params={"format": "json"}).respond(
+        200, json={"UserInfoCount": {"userNumber": 12}}
+    )
 
 
 async def _hikvision(objetivo, credencial=CRED):
@@ -148,6 +151,7 @@ async def test_hikvision_terminal_sin_acsworkstatus_sigue_ok():
             200, content=_leer("hikvision_acceso/time.xml")
         )
         mock.get(f"{BASE}/ISAPI/AccessControl/AcsWorkStatus").respond(404)
+        mock.get(f"{BASE}/ISAPI/AccessControl/UserInfo/Count").respond(404)
         r = await _hikvision(_objetivo("hikvision_acceso"))
     assert r.estado == Estado.OK
 
@@ -161,6 +165,7 @@ async def test_hikvision_solo_llama_lo_permitido():
         "/ISAPI/System/deviceInfo",
         "/ISAPI/System/time",
         "/ISAPI/AccessControl/AcsWorkStatus",
+        "/ISAPI/AccessControl/UserInfo/Count",
     }
 
 
@@ -170,6 +175,10 @@ async def test_hikvision_solo_llama_lo_permitido():
         ("POST", "/ISAPI/AccessControl/AcsEvent", {"format": "json"}),  # marcaciones
         ("GET", "/ISAPI/AccessControl/AcsEvent", {"format": "json"}),
         ("POST", "/ISAPI/AccessControl/UserInfo/Search", {"format": "json"}),  # personas
+        ("GET", "/ISAPI/AccessControl/UserInfo/Search", {"format": "json"}),
+        ("GET", "/ISAPI/AccessControl/UserInfo/Count", {}),  # sin format: no coincide
+        ("PUT", "/ISAPI/AccessControl/UserInfo/Count", {"format": "json"}),
+        ("GET", "/ISAPI/AccessControl/FaceDataRecord", {"format": "json"}),
         ("GET", "/ISAPI/AccessControl/CardInfo/Count", {"format": "json"}),
         ("PUT", "/ISAPI/AccessControl/RemoteControl/door/1", {}),  # abrir puerta
         ("PUT", "/ISAPI/System/reboot", {}),
@@ -312,6 +321,8 @@ async def _hikvision_real(**parametros):
         mock.get(f"{BASE}/ISAPI/AccessControl/AcsWorkStatus").respond(
             200, content=_leer(f"{K2602T}/AcsWorkStatus.json")
         )
+        # Aún sin captura real del conteo: se simula un firmware que no lo ofrece.
+        mock.get(f"{BASE}/ISAPI/AccessControl/UserInfo/Count").respond(404)
         async with httpx.AsyncClient() as cliente:
             adaptador = AdaptadorHikvisionAcceso(
                 cliente_http=cliente, reloj=RelojFalso(MOMENTO_CAPTURA)
@@ -345,6 +356,7 @@ async def test_zona_horaria_incorrecta_no_se_confunde_con_reloj_desfasado():
         )
         mock.get(f"{BASE}/ISAPI/System/time").respond(200, content=_leer(f"{K2602T}/time.xml"))
         mock.get(f"{BASE}/ISAPI/AccessControl/AcsWorkStatus").respond(200, json=acs)
+        mock.get(f"{BASE}/ISAPI/AccessControl/UserInfo/Count").respond(404)
         async with httpx.AsyncClient() as cliente:
             adaptador = AdaptadorHikvisionAcceso(
                 cliente_http=cliente, reloj=RelojFalso(MOMENTO_CAPTURA)
@@ -371,3 +383,24 @@ def test_lectoras_faltantes(en_linea, esperadas, direcciones, faltantes):
     from idcmd_agente.adaptadores.hikvision_acceso import lectoras_faltantes
 
     assert lectoras_faltantes(en_linea, esperadas, direcciones) == faltantes
+
+
+async def test_panel_real_totales_y_modos_de_verificacion():
+    r = await _hikvision_real(lectoras_direcciones="1,3")
+    assert r.metricas["tarjetas_registradas"] == 1
+    assert r.metricas["modos_verificacion"] == "1:7,3:3"  # lectora 1 huella o tarjeta; 3 tarjeta
+    assert "usuarios_registrados" not in r.metricas  # el conteo respondió 404
+
+
+async def test_total_de_usuarios():
+    with respx.mock() as mock:
+        _mock_hikvision(mock)
+        r = await _hikvision(_objetivo("hikvision_acceso"))
+    assert r.metricas["usuarios_registrados"] == 12
+
+
+def test_modos_verificacion_sin_direcciones():
+    from idcmd_agente.adaptadores.hikvision_acceso import modos_verificacion
+
+    assert modos_verificacion([7, 3]) == "1:7,2:3"
+    assert modos_verificacion("x") is None

@@ -48,6 +48,13 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
   versión lo leyó mal y dio una falsa "lectora desconectada"; corregido y cubierto con
   pruebas. Configurar `lectoras_direcciones: "1,3"` para saber cuál falta si una cae.
 
+- Pedidos de Pablo (2026-10-27), implementados: totales de usuarios/tarjetas y modo de
+  verificación por lectora (ADR 0008); alertas de almacenamiento del NVR (capacidad
+  reducida, disco casi lleno solo si el NVR no sobrescribe) y retención PROYECTADA: un NVR
+  al 100 % sobrescribiendo es lo normal; un NVR nuevo con pocos días reales no es falla.
+- Pedido en diseño: auditoría de accesos administrativos a los equipos (quién entra con
+  usuario admin a buscar video o cambiar configuración). Requiere decisión de privacidad.
+
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.
 - Usuario de solo lectura (u operador) en cada panel para el agente.

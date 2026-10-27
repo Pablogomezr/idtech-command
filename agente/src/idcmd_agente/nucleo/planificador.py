@@ -1,7 +1,8 @@
 """Planificador: ejecuta cada objetivo en su intervalo y alimenta el buzón.
 
-Flujo por chequeo: adaptador -> agregador (resumen horario) -> máquina de
-estados (antirrebote) -> buzón (disco) -> despertar al enviador si hubo evento.
+Flujo por chequeo: adaptador -> agregador (resumen horario) -> instantánea (si cambió
+una métrica estable) -> máquina de estados (antirrebote) -> buzón (disco) -> despertar al
+enviador si hubo evento.
 
 Un adaptador que falla, se cuelga o no tiene credencial produce un resultado
 DESCONOCIDO; nunca detiene a los demás.
@@ -19,6 +20,7 @@ from ..adaptadores import Adaptador, obtener
 from ..boveda import Boveda, Credencial
 from .agregador import Agregador
 from .buzon import Buzon
+from .instantaneas import SelectorInstantaneas
 from .maquina_estados import MaquinaEstados
 from .modelos import Estado, EventoEstado, Objetivo, ResultadoChequeo, ahora_utc
 
@@ -40,6 +42,7 @@ class Planificador:
         max_concurrencia: int = 32,
         timeout_chequeo_s: float = 30.0,
         adaptadores: dict[str, Adaptador] | None = None,
+        instantaneas: SelectorInstantaneas | None = None,
     ):
         self.objetivos = objetivos
         self._boveda = boveda
@@ -50,6 +53,7 @@ class Planificador:
         self._reloj = reloj
         self._semaforo = asyncio.Semaphore(max_concurrencia)
         self._timeout = timeout_chequeo_s
+        self._instantaneas = instantaneas or SelectorInstantaneas()
         # Una instancia por adaptador; un nombre desconocido falla al arrancar, no en caliente.
         self._adaptadores = adaptadores or {
             nombre: obtener(nombre)() for nombre in {o.adaptador for o in objetivos}
@@ -66,6 +70,8 @@ class Planificador:
                 continue
             for agregado in self._agregador.registrar(r):
                 self._buzon.encolar_agregado(agregado, momento)
+            if (instantanea := self._instantaneas.evaluar(r)) is not None:
+                self._buzon.encolar_instantanea(instantanea, momento)
             evento = self._maquina.procesar(r)
             if evento is not None:
                 self._buzon.registrar_transicion(evento, momento)
