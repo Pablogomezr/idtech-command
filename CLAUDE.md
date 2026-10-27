@@ -108,8 +108,8 @@ IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "
 | `icmp` | Cualquiera con IP | Respuesta, latencia, pérdida | Probado en contenedor |
 | `hikvision_acceso` | Paneles/terminales Hikvision (ISAPI) | Modelo, firmware, serie, reloj, tamper, lectoras, batería | Validar con equipo real |
 | `dahua_acceso` / `dahua_camara` | Controladoras y cámaras Dahua (CGI) | Modelo, firmware, serie, reloj | Validar con equipo real |
-| `dahua_nvr` | NVR Dahua (de sistema, con `canales`) | Identidad, discos, uso, cámara conectada por canal | Validar con equipo real |
-| `dahua_retencion` | NVR Dahua (`deteccion: false`, cada 15 min) | Retención real por cámara vs contratada | Validar con equipo real |
+| `dahua_nvr` | NVR Dahua (de sistema, con `canales`) | Identidad, discos, uso, cámara conectada por canal | ✅ Validado en oficina: DHI-NVR5432-EI, fw 5.001 (2026-03-31), http |
+| `dahua_retencion` | NVR Dahua (`deteccion: false`, cada 15 min) | Retención real por cámara vs contratada | ✅ Validado en oficina (falta confirmar que el filtro por canal se respeta) |
 | `simulado` | Demos | Caídas ficticias reproducibles | — |
 
 Para validar uno contra un equipo real: `idcmd sondear --adaptador <nombre> --direccion <ip>

@@ -145,6 +145,19 @@ def cmd_sondear(args) -> int:
         canales=canales,
     )
     etiquetas = {objetivo.dispositivo_id: "equipo", **{d: f"canal {n}" for n, d in canales.items()}}
+    if args.capturar:
+        # Validar antes de consultar el equipo: un error aquí no debe verse como falla del equipo.
+        try:
+            args.capturar.mkdir(parents=True, exist_ok=True)
+            (args.capturar / ".prueba").write_bytes(b"")
+            (args.capturar / ".prueba").unlink()
+        except OSError:
+            print(
+                f"no se puede escribir en {args.capturar}. En Docker, monte la carpeta con "
+                "-v ${PWD}/captura:/captura y use --capturar /captura (misma ruta).",
+                file=sys.stderr,
+            )
+            return 2
     try:
         adaptador = clase(capturar_en=args.capturar) if args.capturar else clase()
     except TypeError:

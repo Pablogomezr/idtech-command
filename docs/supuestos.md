@@ -26,6 +26,16 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
 - Modo laboratorio: central, base y agente en un mismo equipo de la oficina; Oracle Cloud
   Bogotá cuando el piloto esté estable.
 
+## Validación en la oficina (2026-10-27)
+
+- NVR Dahua DHI-NVR5432-EI (32 canales), firmware 5.001.0000000.2.R build 2026-03-31, por
+  http: identidad, desfase de reloj (2,3 s), discos (sin error, 52,7 % de uso) y estado por
+  canal (getCameraState) responden como se esperaba.
+- Retención real: 119,9 días en los canales 1, 2 y 5. El disco no está lleno, así que hoy la
+  retención es la antigüedad de la grabación, no un límite. Pendiente: confirmar con la
+  captura que la búsqueda respeta el canal (los tres dieron el mismo valor).
+- Pendiente: saber si los canales 3 y 4 tienen cámara (posible primera falla real detectada).
+
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.
 - Usuario de solo lectura (u operador) en cada panel para el agente.

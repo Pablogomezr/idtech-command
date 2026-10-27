@@ -292,3 +292,23 @@ def test_sondear_nvr_con_canales(monkeypatch, capsys):
     salida = capsys.readouterr().out
     assert '"de": "equipo"' in salida and '"de": "canal 2"' in salida
     assert "camara_desconectada_nvr" in salida
+
+
+def test_sondear_con_carpeta_de_captura_no_escribible(capsys, tmp_path):
+    from idcmd_agente.cli import main
+
+    # Un archivo donde debería ir una carpeta: falla incluso ejecutando como root.
+    (tmp_path / "archivo").write_text("x")
+    codigo = main(
+        [
+            "sondear",
+            "--adaptador",
+            "dahua_nvr",
+            "--direccion",
+            IP,
+            "--capturar",
+            str(tmp_path / "archivo" / "captura"),
+        ]
+    )
+    assert codigo == 2
+    assert "no se puede escribir" in capsys.readouterr().err
