@@ -97,6 +97,9 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
   archivos de junio de una cámara anterior. La más antigua no dice si la cámara sigue
   grabando: se agregó la búsqueda de grabación en las últimas 2 h (`sin_grabacion_reciente`)
   y la verificación del canal de la respuesta (`busqueda_canal_inconsistente`).
+- Validado (v16, 22:29Z): canales 1, 2 y 3 `ok` con 120,3 días; canal 5 (cámara movida al
+  3) `canal_sin_camara` en salud y `sin_grabacion_reciente` en retención. NVR Dahua completo
+  con `idcmd_monitor`: salud, cámaras, retención, grabación reciente y auditoría.
 
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.

@@ -34,6 +34,14 @@ Además, si la clave del agente queda mal o la cambian, el equipo bloquea la cue
 pocos intentos fallidos (el NVR Dahua de la oficina se bloqueó ~25 min): con una cuenta
 propia, el bloqueo nunca afecta a los operadores. Al cambiar la clave en el equipo, actualizar
 la bóveda del agente el mismo día.
+
+En los NVR, la cuenta del agente necesita permiso de **vista en vivo / monitoreo en TODOS los
+canales** contratados (los NVR Dahua dan permisos por canal). Sin él, el estado o la
+búsqueda de grabaciones de ese canal pueden fallar y parecer una cámara caída.
+
+Verificación antes de dejar el sitio, con la cuenta del agente (no con `admin`), canal por
+canal contratado: `dahua_nvr` debe dar cada canal `ok` y `dahua_retencion` debe dar `ok`
+(o `retencion_proyectada_insuficiente` si el disco no alcanza), nunca `sin_grabacion_reciente`.
 ```bash
 docker compose run --rm agente credenciales guardar milestone-principal --usuario svc_idcmd
 docker compose run --rm agente credenciales listar
