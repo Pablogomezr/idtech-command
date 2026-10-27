@@ -66,6 +66,11 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
   huella o tarjeta) pero el panel reporta [7, 3, 3, 3]; se envía la lista cruda. Código 7
   confirmado. Pendiente: leer el plan de autenticación por lectora para el modo exacto.
 
+- Retención proyectada validada con el NVR real (2026-10-27, versión 9): 120,2 días reales y
+  227,1 proyectados en los canales 1, 2 y 5 frente a 30 contratados. La "falla" previa era
+  el bloqueo de la cuenta, no la búsqueda. `cuenta_bloqueada` (1800 s) también se vio en
+  real con `idcmd_monitor`, tras varios intentos con clave rechazada por la API.
+
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.
 - Usuario de solo lectura (u operador) en cada panel para el agente.
