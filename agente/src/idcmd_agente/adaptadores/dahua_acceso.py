@@ -67,7 +67,7 @@ class _AdaptadorDahuaBasico:
         try:
             metricas, hallazgos = await leer_identidad(cliente, objetivo.parametros, self._reloj())
         except ErrorDahua as e:
-            return [resultado(e.estado, e.codigo)]
+            return [resultado(e.estado, e.codigo, **e.metricas)]
         except httpx.TransportError:
             return [resultado(Estado.CAIDO, "sin_respuesta_http")]
         finally:

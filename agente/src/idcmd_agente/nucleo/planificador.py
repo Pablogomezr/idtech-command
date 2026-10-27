@@ -14,7 +14,7 @@ import asyncio
 import logging
 import random
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from ..adaptadores import Adaptador, obtener
 from ..boveda import Boveda, Credencial
@@ -27,6 +27,12 @@ from .modelos import Estado, EventoEstado, Objetivo, OperacionEquipo, ResultadoC
 log = logging.getLogger(__name__)
 
 INTERVALO_MANTENIMIENTO_S = 60
+
+# Problemas de acceso: insistir con una clave rechazada bloquea la cuenta del equipo (los NVR
+# Dahua la bloquean tras pocos intentos; visto en la oficina, 2026-10-27). Si esa cuenta
+# fuera la de los operadores, el agente los dejaría sin acceso. Se pausa el objetivo.
+PAUSA_CREDENCIAL_RECHAZADA = timedelta(minutes=30)
+MARGEN_DESBLOQUEO = timedelta(minutes=1)
 
 
 class Planificador:
@@ -54,13 +60,17 @@ class Planificador:
         self._semaforo = asyncio.Semaphore(max_concurrencia)
         self._timeout = timeout_chequeo_s
         self._instantaneas = instantaneas or SelectorInstantaneas()
+        self._pausas: dict[tuple, tuple[datetime, list[ResultadoChequeo]]] = {}
         # Una instancia por adaptador; un nombre desconocido falla al arrancar, no en caliente.
         self._adaptadores = adaptadores or {
             nombre: obtener(nombre)() for nombre in {o.adaptador for o in objetivos}
         }
 
     async def chequear(self, objetivo: Objetivo) -> list[EventoEstado]:
-        resultados = await self._observar(objetivo)
+        resultados = self._resultados_en_pausa(objetivo)
+        if resultados is None:
+            resultados = await self._observar(objetivo)
+            self._pausar_si_hay_problema_de_acceso(objetivo, resultados)
         momento = self._reloj()
         eventos: list[EventoEstado] = []
         propios = {objetivo.dispositivo_id, *objetivo.canales.values()}
@@ -90,6 +100,47 @@ class Planificador:
         if eventos:
             self._al_haber_eventos()
         return eventos
+
+    def _resultados_en_pausa(self, objetivo: Objetivo) -> list[ResultadoChequeo] | None:
+        """Durante la pausa NO se consulta el equipo: se repite el último resultado (con la
+        hora actual) para que el estado se confirme y la central se entere del problema."""
+        clave = (objetivo.dispositivo_id, objetivo.adaptador)
+        pausa = self._pausas.get(clave)
+        if pausa is None:
+            return None
+        hasta, ultimos = pausa
+        ahora = self._reloj()
+        if ahora >= hasta:
+            del self._pausas[clave]
+            return None
+        return [r.model_copy(update={"observado_at": ahora}) for r in ultimos]
+
+    def _pausar_si_hay_problema_de_acceso(self, objetivo: Objetivo, resultados: list) -> None:
+        problemas = [
+            r
+            for r in resultados
+            if isinstance(r, ResultadoChequeo)
+            and r.codigo in ("credencial_rechazada", "cuenta_bloqueada")
+        ]
+        if not problemas:
+            return
+        r = problemas[0]
+        if r.codigo == "cuenta_bloqueada":
+            espera = timedelta(seconds=r.metricas.get("bloqueo_restante_s", 1800))
+            espera += MARGEN_DESBLOQUEO
+        else:
+            espera = PAUSA_CREDENCIAL_RECHAZADA
+        self._pausas[(objetivo.dispositivo_id, objetivo.adaptador)] = (
+            self._reloj() + espera,
+            [x for x in resultados if isinstance(x, ResultadoChequeo)],
+        )
+        log.warning(
+            "%s en %s (%s): no se consultará durante %d min para no bloquear la cuenta",
+            r.codigo,
+            objetivo.direccion,
+            objetivo.adaptador,
+            espera.total_seconds() // 60,
+        )
 
     async def _observar(self, objetivo: Objetivo) -> list[ResultadoChequeo]:
         def desconocido(codigo: str) -> list[ResultadoChequeo]:

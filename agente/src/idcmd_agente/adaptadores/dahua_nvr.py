@@ -40,6 +40,7 @@ from ..boveda import Credencial
 from ..nucleo.modelos import Estado, Objetivo, ResultadoChequeo, ahora_utc
 from .base import registrar
 from .dahua_comun import (
+    CODIGOS_ACCESO,
     FORMATO_FECHA,
     OPS_IDENTIDAD,
     PATRON_FECHA,
@@ -48,6 +49,7 @@ from .dahua_comun import (
     crear_cliente,
     hora_local_a_utc,
     leer_identidad,
+    verificar_acceso,
 )
 from .http_seguro import ClienteSoloLectura, Operacion
 
@@ -208,7 +210,7 @@ class AdaptadorDahuaNvr(_BaseNvr):
                     json={"uniqueChannels": [-1]},
                 )
         except ErrorDahua as e:
-            return [resultado(nvr, "dahua_nvr", e.estado, e.codigo)]
+            return [resultado(nvr, "dahua_nvr", e.estado, e.codigo, **e.metricas)]
         except httpx.TransportError:
             return [resultado(nvr, "dahua_nvr", Estado.CAIDO, "sin_respuesta_http")]
         finally:
@@ -317,6 +319,8 @@ class AdaptadorDahuaRetencion(_BaseNvr):
                 try:
                     inicio = await self._grabacion_mas_antigua(cliente, canal, ahora, zona)
                 except ErrorDahua as e:
+                    if e.codigo in CODIGOS_ACCESO:
+                        raise
                     salida.append(resultado(camara, e.estado, e.codigo))
                     continue
                 if inicio is None:
@@ -329,6 +333,11 @@ class AdaptadorDahuaRetencion(_BaseNvr):
                 dias = round((ahora - inicio).total_seconds() / 86400, 1)
                 estado, codigo, metricas = juzgar_retencion(dias, uso, contratada)
                 salida.append(resultado(camara, estado, codigo, **metricas))
+        except ErrorDahua as e:
+            # Sin acceso al equipo: se informa para todas las cámaras y no se insiste.
+            return [
+                resultado(c, e.estado, e.codigo, **e.metricas) for c in objetivo.canales.values()
+            ]
         except httpx.TransportError:
             return [
                 resultado(c, Estado.DESCONOCIDO, "sin_respuesta_http")
@@ -344,6 +353,7 @@ class AdaptadorDahuaRetencion(_BaseNvr):
         r = await cliente.solicitar(
             "GET", "/cgi-bin/storageDevice.cgi", params={"action": "getDeviceAllInfo"}
         )
+        verificar_acceso(r)
         if r.status_code != 200:
             return None
         discos = interpretar_discos(r.text)
@@ -356,8 +366,7 @@ class AdaptadorDahuaRetencion(_BaseNvr):
     ) -> datetime | None:
         ruta = "/cgi-bin/mediaFileFind.cgi"
         r = await cliente.solicitar("GET", ruta, params={"action": "factory.create"})
-        if r.status_code == 401:
-            raise ErrorDahua(Estado.DESCONOCIDO, "credencial_rechazada")
+        verificar_acceso(r)
         objeto = clave_valor(r.text).get("result")
         if r.status_code != 200 or not objeto or not objeto.isdigit():
             raise ErrorDahua(Estado.DESCONOCIDO, "busqueda_no_soportada")

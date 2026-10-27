@@ -12,6 +12,7 @@ todo se interpreta de forma defensiva y se valida con `idcmd sondear --capturar`
 
 from __future__ import annotations
 
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -37,9 +38,34 @@ OPS_IDENTIDAD = [
 
 
 class ErrorDahua(Exception):
-    def __init__(self, estado: Estado, codigo: str):
+    def __init__(self, estado: Estado, codigo: str, metricas: dict | None = None):
         super().__init__(codigo)
-        self.estado, self.codigo = estado, codigo
+        self.estado, self.codigo, self.metricas = estado, codigo, metricas or {}
+
+
+# Problemas de acceso: no tiene sentido seguir consultando el equipo (ver planificador).
+CODIGOS_ACCESO = frozenset({"credencial_rechazada", "cuenta_bloqueada"})
+_RM_LOCK = re.compile(r'"RmLock"\s*:\s*(\d+)')
+
+
+def segundos_bloqueo(respuesta: httpx.Response) -> int | None:
+    """Segundos que le quedan al bloqueo de la cuenta, o None si no está bloqueada.
+
+    Tras varios intentos fallidos, Dahua responde 403 con
+    {"ErrorCode": 268632081, "RmLock": 1514, "RmLogin": 0} (NVR de la oficina, 2026-10-27):
+    RmLock = segundos de bloqueo restantes, RmLogin = intentos que quedan.
+    """
+    if respuesta.status_code not in (401, 403):
+        return None
+    m = _RM_LOCK.search(respuesta.text)
+    return int(m.group(1)) if m and int(m.group(1)) > 0 else None
+
+
+def verificar_acceso(respuesta: httpx.Response) -> None:
+    if (segundos := segundos_bloqueo(respuesta)) is not None:
+        raise ErrorDahua(Estado.DESCONOCIDO, "cuenta_bloqueada", {"bloqueo_restante_s": segundos})
+    if respuesta.status_code == 401:
+        raise ErrorDahua(Estado.DESCONOCIDO, "credencial_rechazada")
 
 
 def clave_valor(texto: str) -> dict[str, str]:
@@ -88,8 +114,7 @@ async def leer_identidad(
     inicio = time.monotonic()
     r_tipo = await magic("getDeviceType")
     latencia = round((time.monotonic() - inicio) * 1000, 2)
-    if r_tipo.status_code == 401:
-        raise ErrorDahua(Estado.DESCONOCIDO, "credencial_rechazada")
+    verificar_acceso(r_tipo)
     if r_tipo.status_code != 200:
         raise ErrorDahua(Estado.DESCONOCIDO, "respuesta_no_reconocida")
     r_version = await magic("getSoftwareVersion")

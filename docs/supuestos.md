@@ -57,6 +57,15 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
   crear la cuenta `idcmd_monitor` en cada equipo. Pendiente legal: incluirlo en la política
   de tratamiento de datos y en los contratos.
 
+- **Bloqueo de cuenta en el NVR (2026-10-27).** Tras muchas pruebas con `admin`, el NVR
+  respondió 403 `{"ErrorCode": 268632081, "RmLock": 1514, "RmLogin": 0}` a todo: cuenta
+  bloqueada ~25 min. Riesgo de producción: un agente con clave vieja reintentando cada minuto
+  dejaría bloqueada la cuenta indefinidamente. Corregido: detección `cuenta_bloqueada`,
+  pausa por clave rechazada y cuenta propia del agente obligatoria.
+- Modos de verificación (DS-K2602T): las lectoras 1 y 3 tienen el mismo modo (iVMS:
+  huella o tarjeta) pero el panel reporta [7, 3, 3, 3]; se envía la lista cruda. Código 7
+  confirmado. Pendiente: leer el plan de autenticación por lectora para el modo exacto.
+
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.
 - Usuario de solo lectura (u operador) en cada panel para el agente.

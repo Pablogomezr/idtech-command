@@ -27,6 +27,10 @@ dependencias, código aburrido y probado.
    (marcaciones, listados de usuarios, tarjetas, rostros); sí **totales** (usuarios y
    tarjetas registrados) y **configuración de seguridad** (modo de verificación). ADR 0008.
 6. **No se pierde ningún dato de estado**: todo pasa por el buzón SQLite antes de enviarse.
+7. **El agente nunca bloquea una cuenta de los equipos.** Usa su cuenta propia
+   (`idcmd_monitor`), nunca `admin`; con `credencial_rechazada` pausa el objetivo 30 min y con
+   `cuenta_bloqueada` espera lo que indica el equipo (planificador). Insistir con una clave
+   vieja dejaría a los operadores del cliente sin acceso.
 
 ## Decisiones (ver `docs/adr/`)
 

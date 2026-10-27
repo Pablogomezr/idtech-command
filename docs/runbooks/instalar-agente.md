@@ -30,6 +30,10 @@ proxy inspecciona TLS, montar la CA del cliente y declararla en `central.ca_adic
 Crear en cada equipo una **cuenta propia del agente** (`idcmd_monitor`) con el mínimo
 privilegio que permita leer estado y registro de operaciones. Nunca usar `admin`: la
 auditoría de accesos (ADR 0009) necesita distinguir al agente de las personas.
+Además, si la clave del agente queda mal o la cambian, el equipo bloquea la cuenta tras unos
+pocos intentos fallidos (el NVR Dahua de la oficina se bloqueó ~25 min): con una cuenta
+propia, el bloqueo nunca afecta a los operadores. Al cambiar la clave en el equipo, actualizar
+la bóveda del agente el mismo día.
 ```bash
 docker compose run --rm agente credenciales guardar milestone-principal --usuario svc_idcmd
 docker compose run --rm agente credenciales listar

@@ -45,6 +45,7 @@ METRICAS_PERMITIDAS: dict[str, tuple[type, ...]] = {
     "desfase_reloj_s": (int, float),
     "zona_horaria_utc_h": (int, float),  # zona configurada en el equipo (p. ej. -5)
     "ntp_activo": (bool,),
+    "bloqueo_restante_s": (int,),  # el equipo bloqueó la cuenta por intentos fallidos
     "numero_serie": (str,),
     # Control de acceso: salud del panel, nunca eventos ni marcaciones de personas.
     "lectoras_desconectadas": (int,),
@@ -75,6 +76,7 @@ METRICAS_VOLATILES = frozenset(
         "retencion_proyectada_dias",
         "almacenamiento_uso_pct",
         "almacenamiento_libre_gb",
+        "bloqueo_restante_s",
     }
 )
 

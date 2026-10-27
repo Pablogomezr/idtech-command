@@ -40,7 +40,7 @@ from ..boveda import Credencial
 from ..nucleo.modelos import Estado, Objetivo, OperacionEquipo, ResultadoChequeo, ahora_utc
 from .base import registrar
 from .comun import texto_seguro
-from .dahua_comun import PATRON_FECHA, clave_valor, crear_cliente
+from .dahua_comun import PATRON_FECHA, ErrorDahua, clave_valor, crear_cliente, verificar_acceso
 from .http_seguro import ClienteSoloLectura, Operacion
 
 _NS = uuid.UUID("5e8b7a2c-3d14-4c9b-8f21-6a0e9d4b7c31")
@@ -212,6 +212,7 @@ class AdaptadorDahuaRegistro(_BaseRegistro):
                     "condition.EndTime": fin.astimezone(zona).strftime(_FORMATO_DAHUA),
                 },
             )
+            verificar_acceso(r)
             token = clave_valor(r.text).get("token", "") if r.status_code == 200 else ""
             if not token.isdigit():
                 return [self._resultado(objetivo, Estado.DESCONOCIDO, "registro_no_soportado")]
@@ -227,6 +228,8 @@ class AdaptadorDahuaRegistro(_BaseRegistro):
                         break
             finally:
                 await cliente.solicitar("GET", ruta, params={"action": "stopFind", "token": token})
+        except ErrorDahua as e:
+            return [self._resultado(objetivo, e.estado, e.codigo, **e.metricas)]
         except httpx.TransportError:
             return [self._resultado(objetivo, Estado.DESCONOCIDO, "sin_respuesta_http")]
         finally:
