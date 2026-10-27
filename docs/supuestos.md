@@ -81,8 +81,15 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
   agente (la clave es correcta). 1599 eventos descartados (1056 "Detección de audio", 543
   "IVS"). Textos reales de operación: "Usuario conectado.", "Cierre ssión usua" (truncado
   por el equipo), "Añadir Usuario", "Illegal Login", "Fallo al iniciar sesión.". Ya se
-  clasifican. Pendiente: todas las entradas salen con cuenta `admin` e IP vacía; hay que
-  ver en qué campo pone el NVR la cuenta real y la IP de origen.
+  clasifican.
+- Formato real del registro (NVR5432, fw 5.001): `User` es la cuenta (todas eran `admin`
+  porque fue Pablo); la IP no tiene campo propio y va en `Detail` ("Dirección IP de inicio
+  de sesión:x.x.x.x"); cada inicio de sesión ocupa dos entradas (grupo e IP, ~6 s) y cada
+  fallo otras dos ("Illegal Login" y "Fallo al iniciar sesión.", sin IP). Se unen de a
+  pares. "Añadir Usuario" a las 14:09 fue la recreación de `idcmd_monitor`: desde entonces
+  la cuenta funciona también en `dahua_nvr` (21:31Z, ok).
+- Pendiente: con `idcmd_monitor`, el canal 5 sale `camara_desconectada_nvr`; con `admin`
+  salía conectado. Falta saber si la cámara se cayó o si es un permiso por canal.
 
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.

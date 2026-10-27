@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import httpx
 import pytest
@@ -18,6 +19,7 @@ from idcmd_agente.adaptadores.registro_operaciones import (
     AdaptadorHikvisionRegistro,
     clasificar,
     es_evento,
+    unir_pares,
 )
 from idcmd_agente.boveda import Credencial
 from idcmd_agente.nucleo.agregador import Agregador
@@ -388,3 +390,47 @@ async def test_fallos_de_inicio_de_sesion_de_la_cuenta_del_agente_se_reportan():
         mock.get(base, params={"action": "stopFind"}).respond(200, text="OK\r\n")
         _, (_, *ops) = await _correr(AdaptadorDahuaRegistro, _objetivo("dahua_registro", NVR_IP))
     assert [(o.tipo, o.cuenta) for o in ops] == [("inicio_sesion_fallido", "idcmd_monitor")]
+
+
+FIXTURES_REGISTRO = Path(__file__).parent / "fixtures" / "dahua_registro"
+
+
+async def test_dahua_registro_real_nvr5432_fw5001():
+    """Formato real del NVR de la oficina (IPs reemplazadas): la IP va en el texto libre
+    (Detail), cada login ocupa dos entradas y cada fallo también."""
+    texto = (FIXTURES_REGISTRO / "dhi-nvr5432-ei_fw5.001" / "doFind_operaciones.txt").read_text()
+    base = f"http://{NVR_IP}/cgi-bin/log.cgi"
+    with respx.mock() as mock:
+        mock.get(base, params={"action": "startFind"}).respond(200, text="token=5\r\n")
+        mock.get(base, params={"action": "doFind"}).respond(200, text=texto)
+        mock.get(base, params={"action": "stopFind"}).respond(200, text="OK\r\n")
+        _, (estado, *ops) = await _correr(
+            AdaptadorDahuaRegistro, _objetivo("dahua_registro", NVR_IP)
+        )
+    assert estado.estado == Estado.OK
+    assert [(o.tipo, o.cuenta, o.ip_origen) for o in ops] == [
+        ("inicio_sesion_fallido", "admin", None),  # el NVR no anota la IP del fallo
+        ("inicio_sesion", "admin", "10.20.30.9"),
+        ("cierre_sesion", "admin", None),
+        ("inicio_sesion", "admin", "10.20.30.9"),
+        ("cambio_configuracion", "admin", None),  # "Añadir Usuario"
+        ("cierre_sesion", "admin", None),
+    ]
+
+
+def test_intentos_fallidos_seguidos_no_se_colapsan():
+    dispositivo = uuid.uuid4()
+    base = datetime(2026, 10, 27, 7, 0, tzinfo=UTC)
+    ops = [
+        OperacionEquipo(
+            id=uuid.uuid4(),
+            dispositivo_id=dispositivo,
+            ocurrido_at=base + timedelta(seconds=s),
+            tipo="inicio_sesion_fallido",
+            cuenta="admin",
+            codigo_fabricante=texto,
+        )
+        for s in range(0, 20, 4)  # 5 intentos, cada uno en 2 entradas -> 10 entradas
+        for texto in ("Illegal Login", "Fallo al iniciar sesion.")
+    ]
+    assert len(unir_pares(ops)) == 5

@@ -271,6 +271,50 @@ def _campo(item: dict[str, str], *pistas: str) -> str | None:
     return None
 
 
+_IPV4 = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b")
+
+
+def ip_de_entrada(item: dict[str, str]) -> str | None:
+    """El DHI-NVR5432-EI (fw 5.001) no tiene campo de IP: la escribe en el texto libre,
+    `Detail=Dirección IP de inicio de sesión:192.168.1.9`. Se toma solo si el texto habla
+    de IP, para no confundir otras cifras con una dirección."""
+    if directa := _campo(item, "ip", "address"):
+        return directa
+    for clave, valor in item.items():
+        if "detail" in clave.lower() and "ip" in _normalizar(valor):
+            if m := _IPV4.search(valor):
+                return m.group(1)
+    return None
+
+
+EMPAREJAR = timedelta(seconds=15)
+
+
+def unir_pares(operaciones: list[OperacionEquipo]) -> list[OperacionEquipo]:
+    """Dahua anota cada inicio de sesión en DOS entradas seguidas (una con el grupo, otra
+    con la IP, ~6 s después) y cada fallo también en dos ("Illegal Login" y "Fallo al
+    iniciar sesión."). Se unen de a pares, no en bloque: diez intentos fallidos seguidos
+    siguen siendo diez, que es lo que delata un ataque de adivinación."""
+    ordenadas = sorted(operaciones, key=lambda o: o.ocurrido_at)
+    salida: list[OperacionEquipo] = []
+    i = 0
+    while i < len(ordenadas):
+        a = ordenadas[i]
+        b = ordenadas[i + 1] if i + 1 < len(ordenadas) else None
+        if (
+            b is not None
+            and (a.tipo, a.cuenta) == (b.tipo, b.cuenta)
+            and b.ocurrido_at - a.ocurrido_at <= EMPAREJAR
+            and (a.ip_origen is None or b.ip_origen is None)
+        ):
+            salida.append(b if b.ip_origen else a)
+            i += 2
+            continue
+        salida.append(a)
+        i += 1
+    return salida
+
+
 @registrar("dahua_registro")
 class AdaptadorDahuaRegistro(_BaseRegistro):
     chequeo = "dahua_registro"
@@ -333,13 +377,13 @@ class AdaptadorDahuaRegistro(_BaseRegistro):
                 ocurrido,
                 texto or "desconocido",
                 item.get("User") or _campo(item, "user"),
-                _campo(item, "ip", "address"),
+                ip_de_entrada(item),
                 credencial.usuario,
             )
             if op is not None:
                 operaciones.append(op)
         self._avanzar(objetivo, inicio, fin, horas, len(items) >= MAX_ENTRADAS)
-        return [self._resultado(objetivo, Estado.OK), *operaciones]
+        return [self._resultado(objetivo, Estado.OK), *unir_pares(operaciones)]
 
 
 # --- Hikvision ---------------------------------------------------------------------------
