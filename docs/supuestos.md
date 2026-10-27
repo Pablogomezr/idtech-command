@@ -71,6 +71,14 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
   el bloqueo de la cuenta, no la búsqueda. `cuenta_bloqueada` (1800 s) también se vio en
   real con `idcmd_monitor`, tras varios intentos con clave rechazada por la API.
 
+- Registro de operaciones del NVR (`dahua_registro`, 2026-10-27): log.cgi responde, pero
+  ~200 entradas por hora son EVENTOS de analítica ("IVS", "GlobalSence IVS", "Detección de
+  audio") anotados a nombre de `admin`, con los textos en español. Con el tope de 500 la
+  lectura de 24 h cubría solo 2,5 h y saltaba el resto (se perdían los inicios de sesión
+  del día). Corregido: se descartan eventos, se clasifica en español y, con el tope
+  alcanzado, se sigue desde la última entrada. Pendiente: ver un inicio de sesión real
+  (campos de cuenta e IP) en la captura.
+
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.
 - Usuario de solo lectura (u operador) en cada panel para el agente.

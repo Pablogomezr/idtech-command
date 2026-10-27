@@ -33,7 +33,7 @@ from .adaptadores import descubrir, obtener
 from .boveda import Boveda, BovedaError, Credencial
 from .config import cargar_config
 from .nucleo.buzon import Buzon
-from .nucleo.modelos import Objetivo
+from .nucleo.modelos import Objetivo, OperacionEquipo
 
 CONFIG_POR_DEFECTO = Path("/config/agente.yaml")
 
@@ -78,8 +78,10 @@ def cmd_credenciales_guardar(args) -> int:
 
 
 def cmd_credenciales_listar(args) -> int:
-    for ref in _boveda(args).listar():
-        print(ref)
+    boveda = _boveda(args)
+    for ref in boveda.listar():
+        # La cuenta no es secreta y evita dudas en laboratorio (¿"nvr" es admin o el agente?).
+        print(f"{ref}\t{boveda.obtener(ref).usuario}")
     return 0
 
 
@@ -183,6 +185,10 @@ def cmd_sondear(args) -> int:
         datos = {"de": etiquetas.get(r.dispositivo_id, "?")}
         datos |= r.model_dump(mode="json", exclude={"dispositivo_id"})
         print(json.dumps(datos, indent=2, ensure_ascii=False))
+    tipos = Counter(r.tipo for r in resultados if isinstance(r, OperacionEquipo))
+    if tipos:
+        detalle = ", ".join(f"{t}={n}" for t, n in tipos.most_common())
+        print(f"{sum(tipos.values())} operaciones: {detalle}")
     if args.capturar:
         print(f"respuestas crudas guardadas en {args.capturar} (revíselas antes de compartirlas)")
     return 0

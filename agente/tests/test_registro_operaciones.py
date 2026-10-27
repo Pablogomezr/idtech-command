@@ -11,11 +11,13 @@ from pydantic import SecretStr
 
 from idcmd_agente.adaptadores.http_seguro import ClienteSoloLectura
 from idcmd_agente.adaptadores.registro_operaciones import (
+    MAX_ENTRADAS,
     OPS_DAHUA,
     OPS_HIKVISION,
     AdaptadorDahuaRegistro,
     AdaptadorHikvisionRegistro,
     clasificar,
+    es_evento,
 )
 from idcmd_agente.boveda import Credencial
 from idcmd_agente.nucleo.agregador import Agregador
@@ -57,6 +59,16 @@ def _objetivo(adaptador, ip):
         ("Upgrade", "actualizacion_firmware"),
         ("SearchRecord", "busqueda_video"),
         ("algo raro", "otra"),
+        # NVR de la oficina en español (2026-10-27).
+        ("Inicio de sesión", "inicio_sesion"),
+        ("Error de inicio de sesión", "inicio_sesion_fallido"),
+        ("Cerrar sesión", "cierre_sesion"),
+        ("Guardar configuración", "cambio_configuracion"),
+        ("Borrar registro", "borrado_registros"),
+        ("Reiniciar", "reinicio"),
+        ("Reproducción", "reproduccion_video"),
+        ("Respaldo", "exportacion_video"),
+        ("Búsqueda de grabaciones", "busqueda_video"),
     ],
 )
 def test_clasificar(texto, tipo):
@@ -125,6 +137,95 @@ async def test_dahua_lectura_incremental_sin_duplicados():
     assert [o.id for o in primera[1:]] == [o.id for o in segunda[1:]]
     # La segunda lectura empieza donde terminó la primera, menos el solape de 10 min.
     assert "condition.StartTime=2026-10-27%2013:50:00" in str(inicio_2)
+
+
+@pytest.mark.parametrize(
+    ("texto", "evento"),
+    [
+        ("IVS", True),
+        ("GlobalSence IVS", True),
+        ("Detección de audio", True),
+        ("Motion Detect", True),
+        ("Video Loss", True),
+        ("Inicio de sesión", False),
+        ("Guardar configuración de eventos", False),  # cambiar la config de eventos SÍ cuenta
+        ("algo raro", False),
+    ],
+)
+def test_eventos_del_equipo_no_son_operaciones(texto, evento):
+    assert es_evento(texto) is evento
+
+
+def _items_dahua(entradas):
+    lineas = [f"found={len(entradas)}"]
+    for i, (hora, tipo, usuario) in enumerate(entradas):
+        lineas += [
+            f"items[{i}].Time={hora}",
+            f"items[{i}].Type={tipo}",
+            f"items[{i}].User={usuario}",
+        ]
+    return "\r\n".join(lineas) + "\r\n"
+
+
+async def test_dahua_descarta_eventos_ivs_y_audio():
+    """El registro del NVR de la oficina: cientos de eventos de analítica a nombre de admin
+    y, entre ellos, el inicio de sesión que sí importa."""
+    texto = _items_dahua(
+        [
+            ("2026-10-27 13:00:00", "IVS", "admin"),
+            ("2026-10-27 13:00:04", "Detección de audio", "admin"),
+            ("2026-10-27 13:01:00", "Inicio de sesión", "admin"),
+            ("2026-10-27 13:02:00", "GlobalSence IVS", "admin"),
+        ]
+    )
+    base = f"http://{NVR_IP}/cgi-bin/log.cgi"
+    with respx.mock() as mock:
+        mock.get(base, params={"action": "startFind"}).respond(200, text="token=5\r\n")
+        mock.get(base, params={"action": "doFind"}).respond(200, text=texto)
+        mock.get(base, params={"action": "stopFind"}).respond(200, text="OK\r\n")
+        _, (_, *ops) = await _correr(AdaptadorDahuaRegistro, _objetivo("dahua_registro", NVR_IP))
+    assert [(o.tipo, o.cuenta) for o in ops] == [("inicio_sesion", "admin")]
+
+
+async def test_dahua_tope_alcanzado_sigue_desde_la_ultima_entrada():
+    """Con más entradas que el tope, la lectura siguiente continúa donde quedó: antes se
+    saltaba hasta "ahora" y se perdían las más recientes (las del día, con los logins)."""
+    paginas = []
+    base_hora = datetime(2026, 10, 26, 14, 0)
+    for p in range(MAX_ENTRADAS // 100):
+        paginas.append(
+            _items_dahua(
+                [
+                    (
+                        (base_hora + timedelta(seconds=10 * (p * 100 + i))).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "IVS",
+                        "admin",
+                    )
+                    for i in range(100)
+                ]
+            )
+        )
+    ultima = base_hora + timedelta(seconds=10 * (MAX_ENTRADAS - 1))
+    reloj = RelojFalso(AHORA)
+    objetivo = _objetivo("dahua_registro", NVR_IP)
+    base = f"http://{NVR_IP}/cgi-bin/log.cgi"
+    with respx.mock() as mock:
+        inicio = mock.get(base, params={"action": "startFind"}).respond(200, text="token=5\r\n")
+        mock.get(base, params={"action": "doFind"}).mock(
+            side_effect=[httpx.Response(200, text=t) for t in paginas]
+            + [httpx.Response(200, text="found=0\r\n")]
+        )
+        mock.get(base, params={"action": "stopFind"}).respond(200, text="OK\r\n")
+        async with httpx.AsyncClient() as cliente:
+            adaptador = AdaptadorDahuaRegistro(cliente_http=cliente, reloj=reloj)
+            await adaptador.chequear(objetivo, CRED)
+            reloj.avanzar(300)
+            await adaptador.chequear(objetivo, CRED)
+    segunda = str(inicio.calls[-1].request.url)
+    desde = ultima.strftime("%Y-%m-%d%%20%H:%M:%S")
+    assert f"condition.StartTime={desde}" in segunda  # sin solape: sigue exactamente ahí
 
 
 async def test_dahua_sin_registro():
