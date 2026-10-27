@@ -40,9 +40,13 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
   el inventario de cada sitio debe listar exactamente los canales con cámara.
 
 - Panel DS-K2602T (fw V1.1.1 build 20230916) en 192.168.1.200: el adaptador leyó todo y
-  encontró caja abierta, batería baja (0 V), 1 de 2 lectoras en línea y **zona horaria
-  UTC+0 sin NTP** (la hora de pared es correcta: −1,9 s). Se separó `zona_horaria_incorrecta`
-  de `reloj_desfasado`. Pendiente: qué significa el valor 3 en `cardReaderOnlineStatus`.
+  encontró y Pablo confirmó: **caja abierta** (tapa abierta), **sin batería de respaldo**
+  (0 V) y **zona horaria UTC+0 sin NTP** (la hora de pared es correcta: −1,9 s). Se separó
+  `zona_horaria_incorrecta` de `reloj_desfasado`.
+- `cardReaderOnlineStatus: [1, 3]` en este firmware es la lista de DIRECCIONES RS-485 de las
+  lectoras en línea (dos lectoras, direcciones 1 y 3), no un estado por puerto. La primera
+  versión lo leyó mal y dio una falsa "lectora desconectada"; corregido y cubierto con
+  pruebas. Configurar `lectoras_direcciones: "1,3"` para saber cuál falta si una cae.
 
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.

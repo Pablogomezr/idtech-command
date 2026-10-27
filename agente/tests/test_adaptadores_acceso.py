@@ -320,14 +320,14 @@ async def _hikvision_real(**parametros):
     return r
 
 
-async def test_panel_real_reporta_sus_cuatro_hallazgos():
+async def test_panel_real_reporta_sus_hallazgos_reales():
     r = await _hikvision_real(lectoras_esperadas=2)
     assert (r.estado, r.codigo) == (Estado.DEGRADADO, "tamper_activo")  # el más grave
     m = r.metricas
     assert m["modelo"] == "DS-K2602T" and m["firmware"] == "V1.1.1 build 20230916"
     assert m["tamper_activo"] is True
     assert m["bateria_baja"] is True
-    assert m["lectoras_desconectadas"] == 1
+    assert m["lectoras_desconectadas"] == 0  # [1, 3] = direcciones de 2 lectoras en línea
     # El reloj de pared está bien (−1,9 s); lo que está mal es la zona horaria.
     assert m["desfase_reloj_s"] == -1.9
     assert m["zona_horaria_utc_h"] == 0.0
@@ -351,3 +351,23 @@ async def test_zona_horaria_incorrecta_no_se_confunde_con_reloj_desfasado():
             )
             [r] = await adaptador.chequear(_objetivo("hikvision_acceso"), CRED)
     assert (r.estado, r.codigo) == (Estado.DEGRADADO, "zona_horaria_incorrecta")
+
+
+@pytest.mark.parametrize(
+    ("en_linea", "esperadas", "direcciones", "faltantes"),
+    [
+        ([1, 3], 2, None, 0),  # DS-K2602T real: direcciones 1 y 3 en línea
+        ([1, 3], None, "1,3", 0),
+        ([1], None, "1,3", 1),  # se cayó la lectora de la dirección 3
+        ([1, 3], None, "1,2,3", 1),
+        ([1, 1, 0, 0], 2, None, 0),  # formato por puerto (documentación)
+        ([1, 0, 0, 0], 2, None, 1),
+        ([0], 1, None, 1),
+        ([1, 3], None, None, None),  # sin datos de instalación: no se evalúa
+        ("x", 2, None, None),
+    ],
+)
+def test_lectoras_faltantes(en_linea, esperadas, direcciones, faltantes):
+    from idcmd_agente.adaptadores.hikvision_acceso import lectoras_faltantes
+
+    assert lectoras_faltantes(en_linea, esperadas, direcciones) == faltantes

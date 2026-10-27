@@ -8,8 +8,10 @@ blanca y una prueba lo verifica.
 Parámetros del objetivo:
     esquema               "http" (por defecto) o "https"
     verificar_tls         False por defecto (certificado autofirmado del equipo)
-    lectoras_esperadas    lectoras conectadas que debe tener el panel; sin este dato no se
-                          evalúan (los puertos libres también se reportan como "fuera de línea")
+    lectoras_esperadas    cuántas lectoras debe tener en línea el panel; sin este dato (ni
+                          lectoras_direcciones) no se evalúan
+    lectoras_direcciones  direcciones RS-485 de las lectoras instaladas, p. ej. "1,3"; más
+                          preciso que lectoras_esperadas porque dice cuál falta
     umbral_desfase_s      desfase de reloj tolerado (120 s por defecto)
     zona_horaria_equipo   zona donde está instalado el equipo ("America/Bogota"); si el
                           equipo tiene otra configurada se informa zona_horaria_incorrecta
@@ -50,6 +52,30 @@ def _xml(texto: bytes) -> dict[str, str]:
     """Hojas de un XML de ISAPI sin espacio de nombres: {'model': 'DS-K2604T', ...}."""
     raiz = ET.fromstring(texto)
     return {el.tag.rsplit("}", 1)[-1]: (el.text or "").strip() for el in raiz.iter()}
+
+
+def lectoras_faltantes(
+    en_linea: object, esperadas: object = None, direcciones: object = None
+) -> int | None:
+    """Cuántas lectoras instaladas no están en línea, o None si no se puede evaluar.
+
+    `cardReaderOnlineStatus` tiene dos formas según el firmware:
+    * lista de DIRECCIONES RS-485 en línea: DS-K2602T fw V1.1.1 responde [1, 3] con dos
+      lectoras sanas en las direcciones 1 y 3 (confirmado en la oficina de IDtech);
+    * estado POR PUERTO (1 en línea, 0 no): [1, 1, 0, 0] según la documentación.
+    Una lista de direcciones nunca tiene ceros ni repetidos; si los tiene, es por puerto.
+    """
+    if not isinstance(en_linea, list) or not all(isinstance(x, int) for x in en_linea):
+        return None
+    por_puerto = 0 in en_linea or len(set(en_linea)) != len(en_linea)
+    if direcciones is not None and not por_puerto:
+        instaladas = {int(d) for d in str(direcciones).replace(" ", "").split(",") if d}
+        return len(instaladas - set(en_linea))
+    if esperadas is None and direcciones is None:
+        return None
+    total = int(esperadas) if esperadas is not None else len(str(direcciones).split(","))
+    conectadas = sum(1 for x in en_linea if x == 1) if por_puerto else len(en_linea)
+    return max(0, total - conectadas)
 
 
 @registrar("hikvision_acceso")
@@ -149,10 +175,12 @@ class AdaptadorHikvisionAcceso:
                 metricas["bateria_baja"] = bool(estado_acs["batteryLowVoltage"])
                 if metricas["bateria_baja"]:
                     hallazgos.append("bateria_baja")
-            esperadas = p.get("lectoras_esperadas")
-            en_linea = estado_acs.get("cardReaderOnlineStatus")
-            if esperadas is not None and isinstance(en_linea, list):
-                faltantes = max(0, int(esperadas) - sum(1 for x in en_linea if x == 1))
+            faltantes = lectoras_faltantes(
+                estado_acs.get("cardReaderOnlineStatus"),
+                p.get("lectoras_esperadas"),
+                p.get("lectoras_direcciones"),
+            )
+            if faltantes is not None:
                 metricas["lectoras_desconectadas"] = faltantes
                 if faltantes:
                     hallazgos.append("lectora_desconectada")
