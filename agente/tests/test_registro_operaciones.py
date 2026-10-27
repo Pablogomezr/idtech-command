@@ -353,3 +353,14 @@ def test_operacion_valida_ip_y_tipo():
             tipo="inicio_sesion",
             ip_origen="no-es-ip",
         )
+
+
+async def test_ventana_inicial_configurable_para_laboratorio():
+    objetivo = _objetivo("dahua_registro", NVR_IP).model_copy(
+        update={"parametros": {"ventana_inicial_h": 4}}
+    )
+    with respx.mock() as mock:
+        _mock_dahua(mock)
+        await _correr(AdaptadorDahuaRegistro, objetivo)
+        url = str(mock.calls[0].request.url)
+    assert "condition.StartTime=2026-10-27%2010:00:00" in url  # 14:00 Bogotá - 4 h

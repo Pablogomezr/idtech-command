@@ -182,7 +182,11 @@ class _BaseRegistro:
         fin = self._reloj()
         cursor = self._cursor.get(objetivo.dispositivo_id)
         if cursor is None:
-            return fin - VENTANA_INICIAL, fin, zona
+            # Primera lectura. En laboratorio (`sondear`, una sola pasada) conviene acortarla:
+            # el NVR de la oficina anota ~4800 entradas por día.
+            horas = objetivo.parametros.get("ventana_inicial_h")
+            ventana = timedelta(hours=float(horas)) if horas else VENTANA_INICIAL
+            return fin - ventana, fin, zona
         desde, con_solape = cursor
         return (desde - SOLAPE if con_solape else desde), fin, zona
 
