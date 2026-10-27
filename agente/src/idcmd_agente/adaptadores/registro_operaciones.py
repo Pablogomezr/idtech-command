@@ -56,8 +56,12 @@ VENTANA_INICIAL = timedelta(hours=24)
 SOLAPE = timedelta(minutes=10)  # se vuelve a leer un poco hacia atrás; los ids deduplican
 MAX_ENTRADAS = 2000
 
+# Operaciones de la cuenta del agente que SÍ se reportan: si alguien usa su credencial para
+# esto (o la adivina), debe saberse. Un inicio de sesión fallido con la cuenta del agente
+# también es la antesala de un bloqueo.
 CRITICAS = frozenset(
     {
+        "inicio_sesion_fallido",
         "cambio_configuracion",
         "borrado_registros",
         "exportacion_video",
@@ -69,6 +73,17 @@ CRITICAS = frozenset(
 # (palabras clave, tipo), en orden: la primera que coincide gana. Inglés y español sin
 # tildes (el texto se normaliza antes de comparar).
 _REGLAS: list[tuple[tuple[str, ...], str]] = [
+    # Gestión de cuentas del equipo ("Añadir Usuario" en el NVR de la oficina): es un cambio
+    # de configuración de seguridad. Va primero para que "Eliminar usuario" no se tome por
+    # borrado de registros.
+    (
+        (
+            "anadir usuario", "agregar usuario", "eliminar usuario", "borrar usuario",
+            "modificar usuario", "add user", "adduser", "delete user", "deleteuser",
+            "modify user", "modifyuser", "contrasena", "password",
+        ),
+        "cambio_configuracion",
+    ),
     (
         ("clear", "dellog", "delete log", "deletelog", "borrar", "limpiar", "eliminar"),
         "borrado_registros",
@@ -80,8 +95,13 @@ _REGLAS: list[tuple[tuple[str, ...], str]] = [
         "exportacion_video",
     ),
     (("playback", "reproduc"), "reproduccion_video"),
-    (("logout", "logoff", "cerrar sesion", "cierre de sesion", "salir"), "cierre_sesion"),
-    (("login", "logon", "sesion"), "inicio_sesion"),
+    # El NVR de la oficina escribe "Cierre ssión usua" (truncado y con errata) y
+    # "Usuario conectado.". "desconectado" va antes porque contiene "conectado".
+    (
+        ("logout", "logoff", "cerrar sesion", "cierre s", "salir", "desconect", "disconnect"),
+        "cierre_sesion",
+    ),
+    (("login", "logon", "sesion", "conectado", "connected"), "inicio_sesion"),
     # Consultas de parámetros (lo que hace el propio agente): no son cambios.
     (("getparm", "getparam", "getconfig", "get config", "getcfg", "read"), "otra"),
     (("search", "query", "find", "busqueda", "buscar", "consulta"), "busqueda_video"),

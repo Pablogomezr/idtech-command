@@ -76,8 +76,13 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
   audio") anotados a nombre de `admin`, con los textos en español. Con el tope de 500 la
   lectura de 24 h cubría solo 2,5 h y saltaba el resto (se perdían los inicios de sesión
   del día). Corregido: se descartan eventos, se clasifica en español y, con el tope
-  alcanzado, se sigue desde la última entrada. Pendiente: ver un inicio de sesión real
-  (campos de cuenta e IP) en la captura.
+  alcanzado, se sigue desde la última entrada.
+- Registro con `idcmd_monitor`, 6 h (2026-10-27 21:24Z): log.cgi responde con la cuenta del
+  agente (la clave es correcta). 1599 eventos descartados (1056 "Detección de audio", 543
+  "IVS"). Textos reales de operación: "Usuario conectado.", "Cierre ssión usua" (truncado
+  por el equipo), "Añadir Usuario", "Illegal Login", "Fallo al iniciar sesión.". Ya se
+  clasifican. Pendiente: todas las entradas salen con cuenta `admin` e IP vacía; hay que
+  ver en qué campo pone el NVR la cuenta real y la IP de origen.
 
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.

@@ -69,6 +69,14 @@ def _objetivo(adaptador, ip):
         ("Reproducción", "reproduccion_video"),
         ("Respaldo", "exportacion_video"),
         ("Búsqueda de grabaciones", "busqueda_video"),
+        # Textos reales del DHI-NVR5432-EI (fw 5.001, 2026-10-27), tal cual los escribe.
+        ("Usuario conectado.", "inicio_sesion"),
+        ("Cierre ssión usua", "cierre_sesion"),
+        ("Fallo al iniciar sesión.", "inicio_sesion_fallido"),
+        ("Illegal Login", "inicio_sesion_fallido"),
+        ("Añadir Usuario", "cambio_configuracion"),
+        ("Eliminar usuario", "cambio_configuracion"),
+        ("Usuario desconectado", "cierre_sesion"),
     ],
 )
 def test_clasificar(texto, tipo):
@@ -364,3 +372,19 @@ async def test_ventana_inicial_configurable_para_laboratorio():
         await _correr(AdaptadorDahuaRegistro, objetivo)
         url = str(mock.calls[0].request.url)
     assert "condition.StartTime=2026-10-27%2010:00:00" in url  # 14:00 Bogotá - 4 h
+
+
+async def test_fallos_de_inicio_de_sesion_de_la_cuenta_del_agente_se_reportan():
+    texto = _items_dahua(
+        [
+            ("2026-10-27 13:00:00", "Usuario conectado.", "idcmd_monitor"),
+            ("2026-10-27 13:01:00", "Fallo al iniciar sesión.", "idcmd_monitor"),
+        ]
+    )
+    base = f"http://{NVR_IP}/cgi-bin/log.cgi"
+    with respx.mock() as mock:
+        mock.get(base, params={"action": "startFind"}).respond(200, text="token=5\r\n")
+        mock.get(base, params={"action": "doFind"}).respond(200, text=texto)
+        mock.get(base, params={"action": "stopFind"}).respond(200, text="OK\r\n")
+        _, (_, *ops) = await _correr(AdaptadorDahuaRegistro, _objetivo("dahua_registro", NVR_IP))
+    assert [(o.tipo, o.cuenta) for o in ops] == [("inicio_sesion_fallido", "idcmd_monitor")]
