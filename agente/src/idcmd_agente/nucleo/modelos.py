@@ -10,6 +10,7 @@ Todo lo que sale del agente pasa por estos modelos. Dos reglas los gobiernan:
 
 from __future__ import annotations
 
+import ipaddress
 import re
 import uuid
 from datetime import UTC, datetime
@@ -263,6 +264,63 @@ class Instantanea(_Estricto):
         return _a_utc(v)
 
 
+TIPOS_OPERACION = frozenset(
+    {
+        "inicio_sesion",
+        "inicio_sesion_fallido",
+        "cierre_sesion",
+        "cambio_configuracion",
+        "busqueda_video",
+        "reproduccion_video",
+        "exportacion_video",
+        "borrado_registros",
+        "reinicio",
+        "actualizacion_firmware",
+        "otra",
+    }
+)
+
+
+class OperacionEquipo(_Estricto):
+    """Una operación administrativa registrada por el equipo (ADR 0009): quién entró
+    (cuenta e IP) y qué hizo (iniciar sesión, cambiar configuración, buscar o exportar
+    video, borrar registros...). Nunca incluye video, imágenes ni datos de personas
+    registradas en el equipo.
+    """
+
+    id: uuid.UUID
+    dispositivo_id: uuid.UUID
+    ocurrido_at: datetime
+    tipo: str
+    cuenta: str | None = None
+    ip_origen: str | None = None
+    codigo_fabricante: str | None = None
+
+    @field_validator("tipo")
+    @classmethod
+    def validar_tipo(cls, v: str) -> str:
+        if v not in TIPOS_OPERACION:
+            raise ValueError(f"tipo de operación desconocido: {v!r}")
+        return v
+
+    @field_validator("cuenta", "codigo_fabricante")
+    @classmethod
+    def validar_texto(cls, v: str | None) -> str | None:
+        if v is not None and not _PATRON_TEXTO_METRICA.fullmatch(v):
+            raise ValueError("texto inválido")
+        return v
+
+    @field_validator("ip_origen")
+    @classmethod
+    def validar_ip(cls, v: str | None) -> str | None:
+        return str(ipaddress.ip_address(v)) if v is not None else None
+
+    @field_validator("ocurrido_at")
+    @classmethod
+    def validar_fecha(cls, v: datetime) -> datetime:
+        return _a_utc(v)
+
+
 class LoteIngesta(_Estricto):
     """Cuerpo de POST /api/v1/ingesta (gzip). Contrato v1."""
 
@@ -273,6 +331,7 @@ class LoteIngesta(_Estricto):
     eventos: list[EventoEstado] = Field(default_factory=list)
     agregados: list[AgregadoHora] = Field(default_factory=list)
     instantaneas: list[Instantanea] = Field(default_factory=list)
+    operaciones: list[OperacionEquipo] = Field(default_factory=list)
 
     @field_validator("enviado_at")
     @classmethod

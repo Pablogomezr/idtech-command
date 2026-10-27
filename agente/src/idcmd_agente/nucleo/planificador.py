@@ -22,7 +22,7 @@ from .agregador import Agregador
 from .buzon import Buzon
 from .instantaneas import SelectorInstantaneas
 from .maquina_estados import MaquinaEstados
-from .modelos import Estado, EventoEstado, Objetivo, ResultadoChequeo, ahora_utc
+from .modelos import Estado, EventoEstado, Objetivo, OperacionEquipo, ResultadoChequeo, ahora_utc
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +65,10 @@ class Planificador:
         eventos: list[EventoEstado] = []
         propios = {objetivo.dispositivo_id, *objetivo.canales.values()}
         for r in resultados:
+            if isinstance(r, OperacionEquipo):
+                if r.dispositivo_id in propios:
+                    self._buzon.encolar_operacion(r, momento)
+                continue
             if r.dispositivo_id not in propios:
                 log.warning("resultado descartado: %s reportó otro dispositivo", objetivo.adaptador)
                 continue

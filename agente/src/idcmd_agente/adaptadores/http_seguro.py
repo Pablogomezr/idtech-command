@@ -25,7 +25,9 @@ from urllib.parse import quote, urlencode
 
 import httpx
 
-_ARGUMENTOS_PERMITIDOS = {"params", "headers", "json", "timeout"}
+# `content`: solo para búsquedas que se piden con cuerpo XML (Hikvision logSearch); la
+# operación (método y ruta) igual tiene que estar en la lista blanca.
+_ARGUMENTOS_PERMITIDOS = {"params", "headers", "json", "content", "timeout"}
 
 
 class OperacionNoPermitida(Exception):

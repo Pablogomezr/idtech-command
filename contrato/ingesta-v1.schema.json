@@ -229,6 +229,75 @@
       ],
       "title": "Latido",
       "type": "object"
+    },
+    "OperacionEquipo": {
+      "additionalProperties": false,
+      "description": "Una operación administrativa registrada por el equipo (ADR 0009): quién entró\n(cuenta e IP) y qué hizo (iniciar sesión, cambiar configuración, buscar o exportar\nvideo, borrar registros...). Nunca incluye video, imágenes ni datos de personas\nregistradas en el equipo.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "dispositivo_id": {
+          "format": "uuid",
+          "title": "Dispositivo Id",
+          "type": "string"
+        },
+        "ocurrido_at": {
+          "format": "date-time",
+          "title": "Ocurrido At",
+          "type": "string"
+        },
+        "tipo": {
+          "title": "Tipo",
+          "type": "string"
+        },
+        "cuenta": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cuenta"
+        },
+        "ip_origen": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ip Origen"
+        },
+        "codigo_fabricante": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Codigo Fabricante"
+        }
+      },
+      "required": [
+        "id",
+        "dispositivo_id",
+        "ocurrido_at",
+        "tipo"
+      ],
+      "title": "OperacionEquipo",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -272,6 +341,13 @@
         "$ref": "#/$defs/Instantanea"
       },
       "title": "Instantaneas",
+      "type": "array"
+    },
+    "operaciones": {
+      "items": {
+        "$ref": "#/$defs/OperacionEquipo"
+      },
+      "title": "Operaciones",
       "type": "array"
     }
   },

@@ -27,8 +27,9 @@ Si la red exige proxy, descomentar `HTTPS_PROXY` y `NO_PROXY` en `docker-compose
 proxy inspecciona TLS, montar la CA del cliente y declararla en `central.ca_adicional`.
 
 ## 4. Credenciales de equipos (en el sitio, por consola)
-Pedir al cliente usuarios de **mínimo privilegio** (ONVIF operador, Milestone solo lectura,
-BioStar operador sin acceso a usuarios ni eventos).
+Crear en cada equipo una **cuenta propia del agente** (`idcmd_monitor`) con el mínimo
+privilegio que permita leer estado y registro de operaciones. Nunca usar `admin`: la
+auditoría de accesos (ADR 0009) necesita distinguir al agente de las personas.
 ```bash
 docker compose run --rm agente credenciales guardar milestone-principal --usuario svc_idcmd
 docker compose run --rm agente credenciales listar

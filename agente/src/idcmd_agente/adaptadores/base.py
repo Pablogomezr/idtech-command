@@ -10,6 +10,7 @@ Reglas para todo adaptador:
 * Solo lectura: usar `ClienteSoloLectura` con una lista blanca de operaciones.
 * Traducir lo que reporta el fabricante al vocabulario común (`METRICAS_PERMITIDAS`).
 * Nunca incluir la credencial ni datos de personas en los resultados.
+* Puede devolver también `OperacionEquipo` (registro de operaciones del equipo, ADR 0009).
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from importlib.metadata import entry_points
 from typing import ClassVar, Protocol, runtime_checkable
 
 from ..boveda import Credencial
-from ..nucleo.modelos import Objetivo, ResultadoChequeo, validar_codigo
+from ..nucleo.modelos import Objetivo, OperacionEquipo, ResultadoChequeo, validar_codigo
 
 GRUPO_ENTRY_POINTS = "idcmd_agente.adaptadores"
 
@@ -32,7 +33,7 @@ class Adaptador(Protocol):
 
     async def chequear(
         self, objetivo: Objetivo, credencial: Credencial | None
-    ) -> list[ResultadoChequeo]: ...
+    ) -> list[ResultadoChequeo | OperacionEquipo]: ...
 
 
 _REGISTRO: dict[str, type[Adaptador]] = {}

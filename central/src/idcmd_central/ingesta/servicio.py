@@ -25,11 +25,18 @@ class ResultadoIngesta:
     rechazados: int
     instantaneas: int = 0
     cambios: int = 0
+    operaciones_nuevas: int = 0
+    operaciones_repetidas: int = 0
 
     @property
     def aceptados(self) -> int:
         return (
-            self.eventos_nuevos + self.eventos_repetidos + self.agregados_nuevos + self.instantaneas
+            self.eventos_nuevos
+            + self.eventos_repetidos
+            + self.agregados_nuevos
+            + self.instantaneas
+            + self.operaciones_nuevas
+            + self.operaciones_repetidas
         )
 
 
@@ -138,8 +145,13 @@ async def ingerir(bd: BaseDatos, agente: AgenteAutenticado, lote: LoteIngesta) -
         eventos = [e for e in lote.eventos if e.dispositivo_id in propios]
         agregados = [g for g in lote.agregados if g.dispositivo_id in propios]
         instantaneas = [i for i in lote.instantaneas if i.dispositivo_id in propios]
-        recibidos = len(lote.eventos) + len(lote.agregados) + len(lote.instantaneas)
-        rechazados = recibidos - len(eventos) - len(agregados) - len(instantaneas)
+        operaciones = [o for o in lote.operaciones if o.dispositivo_id in propios]
+        recibidos = (
+            len(lote.eventos) + len(lote.agregados) + len(lote.instantaneas) + len(lote.operaciones)
+        )
+        rechazados = recibidos - (
+            len(eventos) + len(agregados) + len(instantaneas) + len(operaciones)
+        )
         if rechazados:
             # Inventario desalineado o agente mal configurado: se registra, no se reintenta.
             log.warning(
@@ -207,6 +219,28 @@ async def ingerir(bd: BaseDatos, agente: AgenteAutenticado, lote: LoteIngesta) -
         for inst in sorted(instantaneas, key=lambda i: i.observado_at):
             cambios += await _registrar_instantanea(con, a, inst)
 
+        operaciones_nuevas = 0
+        for o in operaciones:
+            cur = await con.execute(
+                "INSERT INTO idcmd.operaciones_equipo (id, dispositivo_id, cliente_id, sitio_id,"
+                " agente_id, ocurrido_at, tipo, cuenta, ip_origen, codigo_fabricante)"
+                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                " ON CONFLICT (id) DO NOTHING RETURNING id",
+                (
+                    o.id,
+                    o.dispositivo_id,
+                    a.cliente_id,
+                    a.sitio_id,
+                    a.agente_id,
+                    o.ocurrido_at,
+                    o.tipo,
+                    o.cuenta,
+                    o.ip_origen,
+                    o.codigo_fabricante,
+                ),
+            )
+            operaciones_nuevas += await cur.fetchone() is not None
+
         latido = lote.latido
         await con.execute(
             _LATIDO,
@@ -225,5 +259,7 @@ async def ingerir(bd: BaseDatos, agente: AgenteAutenticado, lote: LoteIngesta) -
         agregados_nuevos=agregados_nuevos,
         instantaneas=len(instantaneas),
         cambios=cambios,
+        operaciones_nuevas=operaciones_nuevas,
+        operaciones_repetidas=len(operaciones) - operaciones_nuevas,
         rechazados=rechazados,
     )

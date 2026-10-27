@@ -40,6 +40,7 @@ dependencias, código aburrido y probado.
 | 0006 | Principio de solo lectura y la excepción del reinicio remoto (Fase 2). |
 | 0007 | Idioma: identificadores y documentación en español, sin tildes ni ñ en el código. |
 | 0008 | Totales de usuarios y configuración de seguridad permitidos; datos de personas no. |
+| 0009 | Auditoría de accesos administrativos (cuenta e IP); solo operaciones, nunca marcaciones. |
 
 Supuestos aprobados por Pablo (P1–P10): `docs/supuestos.md`.
 
@@ -112,6 +113,7 @@ IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "
 | `hikvision_acceso` | Paneles/terminales Hikvision (ISAPI) | Modelo, firmware, serie, reloj, zona horaria, NTP, tamper, lectoras, batería | ✅ Validado en oficina: DS-K2602T, fw V1.1.1 (2023-09-16), http |
 | `dahua_acceso` / `dahua_camara` | Controladoras y cámaras Dahua (CGI) | Modelo, firmware, serie, reloj | Validar con equipo real |
 | `dahua_nvr` | NVR Dahua (de sistema, con `canales`) | Identidad, discos, uso, cámara conectada por canal | ✅ Validado en oficina: DHI-NVR5432-EI, fw 5.001 (2026-03-31), http |
+| `dahua_registro` / `hikvision_registro` | Registro de operaciones (ADR 0009) | Quién entró (cuenta, IP) y qué hizo | Validar con equipo real |
 | `dahua_retencion` | NVR Dahua (`deteccion: false`, cada 15 min) | Retención real por cámara vs contratada | ✅ Validado en oficina (falta confirmar que el filtro por canal se respeta) |
 | `simulado` | Demos | Caídas ficticias reproducibles | — |
 

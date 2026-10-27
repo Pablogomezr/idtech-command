@@ -51,6 +51,13 @@ objetivos:
     canales:
       1: "99999999-9999-4999-8999-999999999991"
       2: "99999999-9999-4999-8999-999999999992"
+  # Auditoría de accesos administrativos (ADR 0009): cada 5 minutos.
+  - dispositivo_id: "88888888-8888-4888-8888-888888888888"
+    adaptador: dahua_registro
+    direccion: "192.168.1.108"
+    credencial_ref: nvr-dahua     # cuenta propia del agente, p. ej. idcmd_monitor
+    intervalo_s: 300
+    deteccion: false
   # Cámara Dahua: ping directo además de lo que informa el NVR.
   - dispositivo_id: "99999999-9999-4999-8999-999999999991"
     adaptador: icmp

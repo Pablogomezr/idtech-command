@@ -32,6 +32,7 @@ from .modelos import (
     Instantanea,
     Latido,
     LoteIngesta,
+    OperacionEquipo,
     RespuestaIngesta,
     ahora_utc,
 )
@@ -122,6 +123,11 @@ class Enviador:
                     Instantanea.model_validate_json(i.cuerpo)
                     for i in items
                     if i.tipo == "instantanea"
+                ],
+                operaciones=[
+                    OperacionEquipo.model_validate_json(i.cuerpo)
+                    for i in items
+                    if i.tipo == "operacion"
                 ],
             )
             await self._publicar(lote)

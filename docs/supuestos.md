@@ -52,8 +52,10 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
   verificación por lectora (ADR 0008); alertas de almacenamiento del NVR (capacidad
   reducida, disco casi lleno solo si el NVR no sobrescribe) y retención PROYECTADA: un NVR
   al 100 % sobrescribiendo es lo normal; un NVR nuevo con pocos días reales no es falla.
-- Pedido en diseño: auditoría de accesos administrativos a los equipos (quién entra con
-  usuario admin a buscar video o cambiar configuración). Requiere decisión de privacidad.
+- Auditoría de accesos administrativos (ADR 0009, opción A aprobada): cuenta e IP de origen.
+  Pendiente: validar los formatos de log.cgi y logSearch con los equipos de la oficina, y
+  crear la cuenta `idcmd_monitor` en cada equipo. Pendiente legal: incluirlo en la política
+  de tratamiento de datos y en los contratos.
 
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.
