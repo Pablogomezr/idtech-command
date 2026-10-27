@@ -88,8 +88,10 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
   fallo otras dos ("Illegal Login" y "Fallo al iniciar sesión.", sin IP). Se unen de a
   pares. "Añadir Usuario" a las 14:09 fue la recreación de `idcmd_monitor`: desde entonces
   la cuenta funciona también en `dahua_nvr` (21:31Z, ok).
-- Pendiente: con `idcmd_monitor`, el canal 5 sale `camara_desconectada_nvr`; con `admin`
-  salía conectado. Falta saber si la cámara se cayó o si es un permiso por canal.
+- Canal 5 "caído" (2026-10-27): real. Pablo movió la cámara al canal 3; el NVR reporta el
+  canal 5 como `"Empty"` (no `"Disconnected"`). Ahora se informa `canal_sin_camara`
+  (causa de configuración) y no `camara_desconectada_nvr`. Pendiente: qué responde el NVR
+  cuando a la cuenta le falta permiso sobre un canal.
 
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.

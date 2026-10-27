@@ -251,6 +251,13 @@ class AdaptadorDahuaNvr(_BaseNvr):
                 continue
             if estado.lower() == "connected":
                 salida.append(resultado(camara, "dahua_nvr_canal", Estado.OK))
+            elif estado.lower() == "empty":
+                # "Empty": el canal ya no tiene cámara asignada en el NVR (alguien la quitó o
+                # la movió de canal; visto en la oficina, 2026-10-27). No graba igual que una
+                # caída, pero la causa es una configuración, no un cable ni un PoE.
+                salida.append(
+                    resultado(camara, "dahua_nvr_canal", Estado.CAIDO, "canal_sin_camara")
+                )
             else:
                 salida.append(
                     resultado(camara, "dahua_nvr_canal", Estado.CAIDO, "camara_desconectada_nvr")

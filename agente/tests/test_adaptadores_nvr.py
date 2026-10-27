@@ -465,3 +465,23 @@ def test_laboratorio_clave_mal_confirmada_no_se_guarda(monkeypatch, tmp_path):
         == 1
     )
     assert not (tmp_path / "s" / "boveda.json").exists()
+
+
+def test_canal_vacio_no_es_camara_desconectada():
+    """NVR de la oficina tras mover la cámara del canal 5 al 3: el 5 queda "Empty". No
+    graba (CAIDO), pero la causa es de configuración y el técnico debe saberlo."""
+    respuesta = httpx.Response(
+        200, content=_leer("dahua_nvr/dhi-nvr5432-ei_fw5.001/getCameraState.json")
+    )
+    camaras = {1: uuid.uuid4(), 3: uuid.uuid4(), 5: uuid.uuid4()}
+    objetivo = _objetivo().model_copy(update={"canales": camaras})
+
+    def resultado(dispositivo, chequeo, estado, codigo=None, **metricas):
+        return (dispositivo, estado, codigo)
+
+    salida = AdaptadorDahuaNvr._estado_camaras(respuesta, objetivo, resultado)
+    assert salida == [
+        (camaras[1], Estado.OK, None),
+        (camaras[3], Estado.OK, None),
+        (camaras[5], Estado.CAIDO, "canal_sin_camara"),
+    ]
