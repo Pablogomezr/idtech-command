@@ -70,3 +70,40 @@ button.discreto { padding: 4px 10px; font-size: 13px; background: transparent; c
 .alerta-agente { color: var(--caido); font-weight: 600; }
 nav.pestanas { display: flex; gap: 16px; margin: 4px 0 12px; font-size: 14px; }
 nav.pestanas a.activa { font-weight: 700; color: var(--texto); }
+
+/* Lectura para el operador: resumen, atención, barras y verificaciones. */
+.resumen { border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; font-size: 15px; }
+.resumen-bien { background: var(--ok-f); color: var(--ok); }
+.resumen-atencion { background: var(--deg-f); color: var(--deg); }
+.resumen-mal { background: var(--caido-f); color: var(--caido); }
+.resumen .vivo { margin-top: 4px; }
+.tarjeta.atencion { border-left: 4px solid var(--deg); }
+.lista-atencion { list-style: none; padding: 0; margin: 0; }
+.lista-atencion li { padding: 6px 0; border-bottom: 1px solid var(--borde); }
+.lista-atencion li:last-child { border-bottom: 0; }
+.punto-estado { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px;
+  vertical-align: middle; }
+.punto-estado.e-caido { background: var(--caido); }
+.punto-estado.e-degradado { background: var(--deg); }
+.punto-estado.e-desconocido { background: var(--nd); }
+.chequeo .que { color: var(--suave); font-size: 13px; }
+.titular { font-weight: 600; margin: 2px 0 4px; }
+.medidor { margin: 6px 0; max-width: 520px; }
+.medidor-etiqueta { display: flex; justify-content: space-between; font-size: 13px; color: var(--suave); }
+.medidor-fondo { height: 10px; background: var(--nd-f); border-radius: 999px; overflow: hidden; margin-top: 3px; }
+.medidor-relleno { height: 100%; border-radius: 999px; }
+.medidor-relleno.n-bien { background: var(--ok); }
+.medidor-relleno.n-atencion { background: var(--deg); }
+.medidor-relleno.n-mal { background: var(--caido); }
+ul.puntos { list-style: none; padding: 0; margin: 4px 0; font-size: 14px; }
+ul.puntos li { padding: 2px 0; }
+ul.puntos .icono { display: inline-block; width: 18px; font-weight: 700; }
+ul.puntos .n-bien .icono { color: var(--ok); }
+ul.puntos .n-atencion { color: var(--deg); }
+ul.puntos .n-mal { color: var(--caido); }
+ul.puntos .n-info { color: var(--suave); }
+.que-hacer { background: var(--deg-f); border-radius: 8px; padding: 8px 10px; margin: 6px 0; font-size: 14px; }
+.que-hacer ol { margin: 4px 0 0; padding-left: 20px; }
+details.tecnicos { margin-top: 6px; font-size: 13px; }
+details.tecnicos summary { color: var(--suave); cursor: pointer; }
+.nota { margin-top: 16px; }

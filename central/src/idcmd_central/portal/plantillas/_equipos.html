@@ -1,41 +1,89 @@
 <div id="equipos" hx-get="/portal/sitios/{{ sitio.id }}/equipos" hx-trigger="every {{ REFRESCO_S }}s"
      hx-swap="outerHTML">
   {% set minutos = ((ahora - sitio.ultimo_latido).total_seconds() / 60) if sitio.ultimo_latido else none %}
-  <div class="vivo">
-    En vivo · actualizado {{ ahora|hora('%H:%M:%S') }} ·
-    <span class="{% if minutos is none or minutos > 5 %}alerta-agente{% endif %}">
-      último contacto del agente {{ hace(sitio.ultimo_latido, ahora) }}
-      {% if minutos is not none and minutos > 5 %}(sin conexión: los estados pueden estar desactualizados){% endif %}
-    </span>
+  {% set sin_agente = minutos is none or minutos > 5 %}
+  {% set con_problema = equipos | selectattr('estado', 'in', ['caido', 'degradado', 'desconocido']) | list %}
+
+  <div class="resumen {% if sin_agente %}resumen-mal{% elif con_problema %}resumen-atencion{% else %}resumen-bien{% endif %}">
+    {% if sin_agente %}
+      <b>✗ Sin conexión con el sitio</b> — el agente no reporta {{ hace(sitio.ultimo_latido, ahora) }}.
+      Los estados de abajo pueden estar desactualizados (¿se cayó el internet o la energía del sitio?).
+    {% elif con_problema %}
+      <b>{{ equipos|length - con_problema|length }} de {{ equipos|length }} equipos sin novedad</b> ·
+      {{ con_problema|length }} {{ 'requiere' if con_problema|length == 1 else 'requieren' }} atención
+    {% else %}
+      <b>✓ Todo en orden</b> — {{ equipos|length }} equipos sin novedad
+    {% endif %}
+    <div class="vivo">En vivo · actualizado {{ ahora|hora('%H:%M:%S') }} · agente: {{ hace(sitio.ultimo_latido, ahora) }}</div>
   </div>
+
+  {% if con_problema %}
+  <div class="tarjeta atencion">
+    <h2 style="margin-top:0">Requiere atención</h2>
+    <ul class="lista-atencion">
+    {% for eq in con_problema %}
+      {% for c in eq.chequeos if c.estado in ['caido', 'degradado', 'desconocido'] %}
+      <li>
+        <span class="punto-estado e-{{ c.estado }}"></span>
+        <a href="#eq-{{ eq.id }}"><b>{{ eq.nombre }}</b></a> — {{ c.lectura.titular }}
+        {% if c.desde %}<span class="vivo">· desde {{ c.desde|hora('%H:%M') }} ({{ hace(c.desde, ahora) }})</span>{% endif %}
+      </li>
+      {% endfor %}
+    {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   {% for eq in equipos %}
-  <div class="tarjeta borde-{{ eq.estado }}">
+  <div class="tarjeta borde-{{ eq.estado }}" id="eq-{{ eq.id }}">
     <div class="equipo-cab">
       <span class="nombre">{{ eq.nombre }}</span>
       <span class="pastilla e-{{ eq.estado }}">{{ ESTADOS[eq.estado] }}</span>
       <span class="modelo">{{ TIPOS_EQUIPO.get(eq.tipo_equipo, eq.tipo_equipo|legible) }}{% if eq.marca %} · {{ eq.marca|capitalize }}{% endif %}{% if eq.modelo %} {{ eq.modelo }}{% endif %}{% if eq.ubicacion %} · {{ eq.ubicacion }}{% endif %}</span>
     </div>
     {% for c in eq.chequeos %}
+    {% set l = c.lectura %}
     <div class="chequeo">
       <div class="titulo">
-        <span>{{ CHEQUEOS.get(c.chequeo, c.chequeo|legible) }}</span>
+        <span class="que">{{ CHEQUEOS.get(c.chequeo, c.chequeo|legible) }}</span>
         {% if c.estado %}<span class="pastilla e-{{ c.estado }}">{{ ESTADOS[c.estado] }}</span>{% endif %}
-        {% if c.codigo %}<span class="codigo">{{ c.codigo|codigo }}</span>{% endif %}
-        {% if c.desde and c.estado != 'ok' %}<span class="vivo">desde {{ c.desde|hora }}</span>{% endif %}
       </div>
-      {% if c.metricas %}
-      <dl class="metricas">
-        {% for k, v in c.metricas.items() %}
-        <dt>{{ METRICAS.get(k, k|legible) }}</dt><dd>{{ v|valor }}</dd>
+      <div class="titular">{{ l.titular }}
+        {% if c.desde and c.estado not in ['ok', none] %}<span class="vivo">· desde {{ c.desde|hora('%d/%m %H:%M') }} ({{ hace(c.desde, ahora) }})</span>{% endif %}
+      </div>
+      {% for b in l.barras %}
+      <div class="medidor">
+        <div class="medidor-etiqueta"><span>{{ b.etiqueta }}</span><span>{{ b.texto }}</span></div>
+        <div class="medidor-fondo"><div class="medidor-relleno n-{{ b.nivel }}" style="width: {{ b.porcentaje|round(1) }}%"></div></div>
+      </div>
+      {% endfor %}
+      {% if l.puntos %}
+      <ul class="puntos">
+        {% for p in l.puntos %}
+        <li class="n-{{ p.nivel }}"><span class="icono">{{ {'bien': '✓', 'atencion': '!', 'mal': '✗', 'info': '·'}[p.nivel] }}</span>{{ p.texto }}</li>
         {% endfor %}
-      </dl>
+      </ul>
+      {% endif %}
+      {% if l.acciones %}
+      <div class="que-hacer"><b>Qué hacer:</b>
+        {% if l.acciones|length == 1 %}{{ l.acciones[0] }}{% else %}
+        <ol>{% for a in l.acciones %}<li>{{ a }}</li>{% endfor %}</ol>{% endif %}
+      </div>
+      {% endif %}
+      {% if l.tecnicos %}
+      <details class="tecnicos"><summary>Detalles técnicos</summary>
+        <dl class="metricas">{% for k, v in l.tecnicos.items() %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}</dl>
+      </details>
       {% endif %}
     </div>
     {% else %}
-    <div class="vivo">Sin datos todavía del agente.</div>
+    <div class="vivo">Sin datos todavía del agente (los primeros llegan en 1 a 2 minutos).</div>
     {% endfor %}
   </div>
   {% else %}
   <div class="tarjeta">Este sitio no tiene equipos en el inventario.</div>
   {% endfor %}
+  <p class="vivo nota">Las caídas se confirman con 3 revisiones seguidas (una por minuto) y aparecen aquí en 2 a
+    4 minutos; esta página se actualiza sola cada {{ REFRESCO_S }} segundos. La grabación y la retención se revisan
+    cada 15 minutos.</p>
 </div>

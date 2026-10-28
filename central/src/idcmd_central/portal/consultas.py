@@ -11,6 +11,8 @@ from datetime import datetime
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
+from .interpretacion import Lectura, interpretar
+
 # Gravedad para resumir un equipo con varios chequeos: manda el peor.
 GRAVEDAD = {"caido": 3, "degradado": 2, "desconocido": 1, "ok": 0}
 
@@ -23,6 +25,7 @@ class Chequeo:
     codigo: str | None
     metricas: dict
     observado_at: datetime | None
+    lectura: Lectura | None = None
 
 
 @dataclass
@@ -33,6 +36,7 @@ class Equipo:
     marca: str | None
     modelo: str | None
     ubicacion: str | None
+    retencion_contratada_dias: int | None = None
     chequeos: list[Chequeo] = field(default_factory=list)
 
     @property
@@ -104,7 +108,13 @@ async def equipos(con: AsyncConnection, sitio_id: uuid.UUID) -> list[Equipo]:
             SELECT dispositivo_id, chequeo FROM idcmd.metricas_actuales WHERE sitio_id = %(s)s
         )
         SELECT d.id, d.nombre, d.tipo_equipo::text AS tipo_equipo, d.marca, d.modelo,
-               d.ubicacion, ch.chequeo,
+               d.ubicacion,
+               -- Las cámaras heredan la retención contratada del grabador del sitio.
+               coalesce(d.retencion_contratada_dias,
+                        (SELECT max(g.retencion_contratada_dias) FROM idcmd.dispositivos g
+                          WHERE g.sitio_id = d.sitio_id AND g.tipo_equipo IN ('nvr', 'dvr')))
+                   AS contratada,
+               ch.chequeo,
                coalesce(e.estado, m.estado)::text AS estado, e.desde, e.codigo,
                coalesce(m.metricas, e.metricas, '{}') AS metricas, m.observado_at
           FROM idcmd.dispositivos d
@@ -122,16 +132,23 @@ async def equipos(con: AsyncConnection, sitio_id: uuid.UUID) -> list[Equipo]:
     for f in await cur.fetchall():
         eq = por_id.setdefault(
             f["id"],
-            Equipo(f["id"], f["nombre"], f["tipo_equipo"], f["marca"], f["modelo"], f["ubicacion"]),
-        )
+            Equipo(
+                f["id"], f["nombre"], f["tipo_equipo"], f["marca"], f["modelo"], f["ubicacion"],
+                f["contratada"],
+            ),
+        )  # fmt: skip
         if f["chequeo"]:
+            metricas = f["metricas"] or {}
             eq.chequeos.append(
                 Chequeo(
-                    f["chequeo"], f["estado"], f["desde"], f["codigo"], f["metricas"] or {},
+                    f["chequeo"], f["estado"], f["desde"], f["codigo"], metricas,
                     f["observado_at"],
+                    interpretar(f["chequeo"], f["estado"], f["codigo"], metricas, f["contratada"]),
                 )
             )  # fmt: skip
     # Primero lo que está mal: es lo que el operador vino a ver.
+    for eq in por_id.values():
+        eq.chequeos.sort(key=lambda c: -GRAVEDAD.get(c.estado or "", 1))
     return sorted(por_id.values(), key=lambda e: (-GRAVEDAD.get(e.estado, 1), e.nombre))
 
 
