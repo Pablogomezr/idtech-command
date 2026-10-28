@@ -19,6 +19,7 @@ rojo() { printf '\033[31m%s\033[0m\n' "$*"; }
 paso() { printf '\n\033[36m== %s ==\033[0m\n' "$*"; }
 # Primer id de una lista de la CLI (vacío si no hay ninguno).
 primero() { jq -r '.data[0].id // empty'; }
+trap 'rojo "Falló en la línea $LINENO. Envíale a Claude el error de arriba (no contiene claves)."' ERR
 
 if [[ "${OCI_REGION:-}" != "sa-bogota-1" ]]; then
   rojo "Cloud Shell está en la región '${OCI_REGION:-?}'. Cámbiala a Colombia Central (Bogota)"
@@ -30,9 +31,11 @@ TENANCY="${OCI_TENANCY:?Cloud Shell no definió OCI_TENANCY}"
 paso "Datos que necesito (ninguno es secreto)"
 echo "Llave PÚBLICA SSH: en tu PC, PowerShell ->  Get-Content \$HOME\\.ssh\\idcmd_oci.pub"
 read -r -p "Pega la llave pública (empieza por ssh-ed25519): " LLAVE
+LLAVE=$(echo "$LLAVE" | tr -d '\r' | sed 's/^ *//; s/ *$//')  # el portapapeles de Windows trae \r
 [[ "$LLAVE" == ssh-ed25519\ * || "$LLAVE" == ssh-rsa\ * ]] || { rojo "Eso no parece una llave pública."; exit 1; }
 echo "IP pública de la oficina: abre https://ifconfig.me desde un PC de la oficina."
 read -r -p "IP pública de la oficina: " IP_OFICINA
+IP_OFICINA=$(echo "$IP_OFICINA" | tr -d '\r ')
 [[ "$IP_OFICINA" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || { rojo "IP no válida."; exit 1; }
 LLAVE_ARCHIVO=$(mktemp)
 echo "$LLAVE" > "$LLAVE_ARCHIVO"
@@ -43,7 +46,7 @@ if [[ -z "$C" ]]; then
   C=$(oci iam compartment create -c "$TENANCY" --name "$COMPARTIMENTO" \
         --description "IDtech Command produccion" --wait-for-state ACTIVE | jq -r .data.id)
   echo "creado; espero a que se propague..."
-  sleep 30
+  sleep "${ESPERA_PROPAGACION:-30}"
 fi
 echo "$C"
 
@@ -97,15 +100,16 @@ if [[ -z "$INST" ]]; then
   [[ -n "$IMAGEN" ]] || { rojo "No encontré la imagen Ubuntu 24.04 para ARM."; exit 1; }
   INICIO=$(mktemp)
   # Primer arranque: abre 80/443 en el firewall del propio Ubuntu (las imágenes de Oracle traen
-  # todo cerrado salvo el 22) e instala Docker desde los paquetes de Ubuntu.
+  # todo cerrado salvo el 22) e instala Docker desde los paquetes de Ubuntu. El servidor nace sin
+  # IP pública (se le pone la reservada en el paso 5), así que espera a tener salida a internet.
   cat > "$INICIO" <<'EOF'
 #cloud-config
 timezone: America/Bogota
 runcmd:
   - sed -i '/-A INPUT -j REJECT/i -A INPUT -p tcp -m state --state NEW -m tcp --dport 80 -j ACCEPT\n-A INPUT -p tcp -m state --state NEW -m tcp --dport 443 -j ACCEPT' /etc/iptables/rules.v4
   - iptables-restore < /etc/iptables/rules.v4
-  - apt-get update
-  - DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io docker-compose-v2 git jq
+  - until curl -fsS -o /dev/null --max-time 10 http://ports.ubuntu.com/; do sleep 10; done
+  - for i in 1 2 3 4 5; do apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io docker-compose-v2 git jq && break; sleep 30; done
   - usermod -aG docker ubuntu
   - systemctl enable --now docker
 EOF
