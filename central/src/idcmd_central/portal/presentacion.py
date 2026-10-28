@@ -168,10 +168,10 @@ CIERRES = {
 ACCIONES_TICKET = {
     "abierto": [("tomar", "Tomar este servicio")],
     "asignado": [("aceptar", "Aceptar"), ("tomar", "Tomar este servicio")],
-    "aceptado": [("en_camino", "Voy en camino"), ("en_sitio", "Llegué al sitio"),
-                 ("resuelto", "Resuelto")],
-    "en_camino": [("en_sitio", "Llegué al sitio"), ("resuelto", "Resuelto")],
-    "en_sitio": [("resuelto", "Resuelto")],
+    # "Llegué al sitio" va aparte: pide la ubicación del celular (una sola vez).
+    "aceptado": [("en_camino", "Voy en camino")],
+    "en_camino": [],
+    "en_sitio": [],
 }  # fmt: skip
 
 

@@ -18,7 +18,7 @@ from psycopg.rows import dict_row
 
 from ..db import BaseDatos
 from ..portal.presentacion import nombre_codigo
-from . import avisos
+from . import avisos, conocimiento
 from .reglas import REGLAS, mas_grave, prioridad
 
 log = logging.getLogger(__name__)
@@ -71,18 +71,46 @@ async def _regla_sla(con, cliente_id, prio) -> dict:
 
 
 async def _fallas_de_equipos(con) -> list[dict]:
+    """Fallas que abren ticket: el código de cada chequeo y, además, las que vienen en las
+    métricas del mismo chequeo (un panel informa un solo código — p. ej. tamper — aunque
+    también le falte la batería; ambas deben quedar en el ticket)."""
     cur = await con.cursor(row_factory=dict_row).execute(
         """
         SELECT e.dispositivo_id, e.cliente_id, e.sitio_id, e.codigo, e.desde,
-               d.nombre AS equipo, d.tipo_equipo::text AS tipo_equipo, d.criticidad
+               d.nombre AS equipo, d.tipo_equipo::text AS tipo_equipo, d.criticidad, d.marca
           FROM idcmd.estado_actual e
           JOIN idcmd.dispositivos d ON d.id = e.dispositivo_id AND d.activo
-         WHERE e.estado IN ('caido', 'degradado', 'desconocido') AND e.codigo = ANY(%s)
-         ORDER BY e.desde
+         WHERE e.estado IN ('caido', 'degradado', 'desconocido') AND e.codigo = ANY(%(codigos)s)
+        UNION
+        SELECT m.dispositivo_id, m.cliente_id, m.sitio_id, x.codigo,
+               coalesce(e.desde, m.observado_at), d.nombre, d.tipo_equipo::text, d.criticidad,
+               d.marca
+          FROM idcmd.metricas_actuales m
+          JOIN idcmd.dispositivos d ON d.id = m.dispositivo_id AND d.activo
+          LEFT JOIN idcmd.estado_actual e
+                 ON e.dispositivo_id = m.dispositivo_id AND e.chequeo = m.chequeo
+         CROSS JOIN LATERAL (VALUES
+               ('tamper_activo', coalesce((m.metricas->>'tamper_activo')::boolean, false)),
+               ('bateria_baja', coalesce((m.metricas->>'bateria_baja')::boolean, false)),
+               ('lectora_desconectada',
+                coalesce((m.metricas->>'lectoras_desconectadas')::int, 0) > 0),
+               ('disco_con_error', coalesce((m.metricas->>'discos_con_error')::int, 0) > 0)
+         ) AS x(codigo, activo)
+         WHERE x.activo AND m.estado <> 'ok'
+         ORDER BY 5
         """,
-        (list(REGLAS),),
+        {"codigos": list(REGLAS)},
     )
     return await cur.fetchall()
+
+
+async def _agregar_pasos(con, t: dict, codigo: str, tipo_equipo, marca) -> None:
+    for orden, texto in enumerate(conocimiento.pasos(codigo, tipo_equipo, marca), start=1):
+        await con.execute(
+            "INSERT INTO idcmd.pasos_ticket (ticket_id, cliente_id, sitio_id, codigo, orden,"
+            " texto) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+            (t["id"], t["cliente_id"], t["sitio_id"], codigo, orden, texto),
+        )
 
 
 async def _sitios_sin_conexion(con, ahora) -> list[dict]:
@@ -126,6 +154,8 @@ async def _abrir(con, ahora, falla: dict, codigo: str, prio: str, tipo: str, tit
     if t:
         donde = f"{falla['equipo']}: " if falla.get("equipo") else ""
         await _evento(con, t, ahora, "apertura", f"Falla detectada — {donde}{titulo}")
+        await _agregar_pasos(con, t, codigo, falla.get("tipo_equipo"), falla.get("marca"))
+    return t
 
 
 async def abrir_tickets(con: AsyncConnection, ahora: datetime, r: Resumen) -> None:
@@ -149,7 +179,7 @@ async def abrir_tickets(con: AsyncConnection, ahora: datetime, r: Resumen) -> No
             evaluadas, key=lambda x: ["baja", "media", "alta", "critica"].index(x[0][0])
         )
         if dispositivo not in abiertos:
-            await _abrir(
+            nuevo = await _abrir(
                 con,
                 ahora,
                 principal,
@@ -159,9 +189,13 @@ async def abrir_tickets(con: AsyncConnection, ahora: datetime, r: Resumen) -> No
                 nombre_codigo(principal["codigo"]),
             )
             r.abiertos += 1
-            continue
-        tid, prio_actual, codigo_actual, cliente_id, sitio_id = abiertos[dispositivo]
-        t = {"id": tid, "cliente_id": cliente_id, "sitio_id": sitio_id}
+            if nuevo is None:
+                continue
+            tid, prio_actual, codigo_actual = nuevo["id"], prio, principal["codigo"]
+            t = nuevo
+        else:
+            tid, prio_actual, codigo_actual, cliente_id, sitio_id = abiertos[dispositivo]
+            t = {"id": tid, "cliente_id": cliente_id, "sitio_id": sitio_id}
         ya = {
             row[0]
             for row in await (
@@ -176,6 +210,7 @@ async def abrir_tickets(con: AsyncConnection, ahora: datetime, r: Resumen) -> No
             texto = f"Nueva novedad: {nombre_codigo(f['codigo'])}"
             if f["codigo"] != codigo_actual and texto not in ya:
                 await _evento(con, t, ahora, "novedad", texto)
+                await _agregar_pasos(con, t, f["codigo"], f["tipo_equipo"], f["marca"])
         nueva = mas_grave(prio_actual, prio)
         if nueva != prio_actual:
             await con.execute("UPDATE idcmd.tickets SET prioridad = %s WHERE id = %s", (nueva, tid))

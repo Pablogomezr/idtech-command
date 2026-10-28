@@ -5,6 +5,9 @@ cliente: IDtech
 regional: Barranquilla
 sitio: Oficina IDtech
 ciudad: Barranquilla
+direccion: Calle 00 # 00-00    # "Cómo llegar" para el técnico
+lat: 10.9878                   # con lat/lon se confirma que el técnico llegó al sitio
+lon: -74.7889
 # Módulo de servicio (opcional): técnico de la zona (usuario del portal con rol tecnico) y
 # personas del cliente que reciben el enlace de seguimiento de cada ticket.
 tecnicos:

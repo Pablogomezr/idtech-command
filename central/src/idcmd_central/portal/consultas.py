@@ -231,7 +231,8 @@ async def ticket(con: AsyncConnection, ticket_id: uuid.UUID) -> dict | None:
     cur = await con.cursor(row_factory=dict_row).execute(
         """
         SELECT t.*, t.prioridad::text AS prioridad, t.estado::text AS estado,
-               s.nombre AS sitio, d.nombre AS equipo, u.nombre AS tecnico
+               s.nombre AS sitio, s.direccion AS sitio_direccion, s.ciudad AS sitio_ciudad,
+               s.lat AS sitio_lat, s.lon AS sitio_lon, d.nombre AS equipo, u.nombre AS tecnico
           FROM idcmd.tickets t
           JOIN idcmd.sitios s ON s.id = t.sitio_id
           LEFT JOIN idcmd.dispositivos d ON d.id = t.dispositivo_id
@@ -278,3 +279,33 @@ async def avisos_enviados(con: AsyncConnection, limite: int = 200) -> list[dict]
         (limite,),
     )
     return await cur.fetchall()
+
+
+# --- Servicio en campo -----------------------------------------------------------------------
+
+
+async def pasos_ticket(con: AsyncConnection, ticket_id: uuid.UUID) -> list[dict]:
+    cur = await con.cursor(row_factory=dict_row).execute(
+        "SELECT p.id, p.codigo, p.orden, p.texto, p.estado, p.marcado_at, u.nombre AS usuario"
+        " FROM idcmd.pasos_ticket p LEFT JOIN idcmd.usuarios u ON u.id = p.usuario_id"
+        " WHERE p.ticket_id = %s ORDER BY p.codigo, p.orden",
+        (ticket_id,),
+    )
+    return await cur.fetchall()
+
+
+async def archivos_ticket(con: AsyncConnection, ticket_id: uuid.UUID) -> list[dict]:
+    cur = await con.cursor(row_factory=dict_row).execute(
+        "SELECT id, tipo, mime, nota, creado_at FROM idcmd.archivos_ticket"
+        " WHERE ticket_id = %s ORDER BY creado_at",
+        (ticket_id,),
+    )
+    return await cur.fetchall()
+
+
+async def archivo(con: AsyncConnection, archivo_id: uuid.UUID) -> dict | None:
+    cur = await con.cursor(row_factory=dict_row).execute(
+        "SELECT id, sitio_id, mime, sha256 FROM idcmd.archivos_ticket WHERE id = %s",
+        (archivo_id,),
+    )
+    return await cur.fetchone()

@@ -35,6 +35,23 @@ la reparación.
   `idcmd.accion_ticket` (valida rol, asignación y transición). El worker usa el rol
   `idcmd_worker` (sin BYPASSRLS, políticas explícitas).
 
-## Pendiente (Partes 2 y 3)
-App del técnico (PWA): check-in con GPS, checklist por falla, fotos y firma; acta PDF por
-servicio; encuesta; cotización de repuestos; WhatsApp.
+## Parte 2 — servicio en campo (2026-10-28)
+- **App instalable (PWA)** sobre el mismo portal: manifiesto, íconos y service worker con
+  página "sin conexión". El service worker solo guarda lo estático, nunca páginas con datos.
+- **Llegada al sitio con ubicación**, pedida SOLO al tocar "Llegué al sitio" (ADR 0003): se
+  guarda la distancia al sitio (radio `radio_checkin_m`) y las coordenadas redondeadas a ~11 m.
+  Si el técnico no la comparte, la llegada se registra igual y queda constancia.
+- **Lista de pasos** copiada de la base de conocimiento al abrir el ticket (la fila más
+  específica: marca + tipo > tipo > genérica). "Resuelto" exige todos los pasos en "hecho" o
+  "no aplica" (disparador en la base). Las fallas que vienen en las métricas (un panel con
+  tamper informa la batería solo en sus métricas) también se anotan con sus pasos.
+- **Fotos** reducidas en el celular (1600 px, JPEG; al redibujarlas pierden el EXIF con la
+  ubicación) y **firma** de quien recibe con el dedo. Se valida el contenido (JPEG/PNG), no la
+  extensión; se guardan fuera de la base, direccionadas por su SHA-256 (una foto alterada en
+  disco se detecta al leerla).
+- **Acta del servicio** imprimible (o PDF desde el navegador) en el portal y en el enlace del
+  cliente: datos, tiempos comprometidos, llegada, pasos, fotos, historial y firma.
+
+## Pendiente (Parte 3)
+Acta PDF generada en el servidor y enviada al cerrar; encuesta de satisfacción; cotización de
+repuestos; WhatsApp; modo sin señal completo (cola de acciones en el celular).

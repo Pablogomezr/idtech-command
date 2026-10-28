@@ -66,7 +66,9 @@ central/     FastAPI: ingesta + portal + worker (idcmd_central)
   src/idcmd_central/contrato.py  espejo del contrato; una prueba lo compara con el esquema
   src/idcmd_central/portal/      ingreso (clave + TOTP), estado en vivo (HTMX), auditoría
   src/idcmd_central/laboratorio.py  inventario YAML -> central + config del agente
-  src/idcmd_central/servicio/    worker de tickets (reglas, apertura, escalamiento, SLA, avisos)
+  src/idcmd_central/servicio/    worker de tickets (reglas, apertura, escalamiento, SLA, avisos),
+                                 base de conocimiento (copia de docs/plantillas) y almacén de fotos
+  src/idcmd_central/portal/campo.py  app del técnico: llegada, pasos, fotos, firma, acta, PWA
 docs/        adr/, runbooks/, plantillas/, supuestos.md
 despliegue/  laboratorio/ (compose + iniciar.ps1 para un PC), minipc/ (nftables)
 ```
@@ -174,6 +176,8 @@ Dahua: **nunca** usar `configManager.cgi` (RemoteDevice devuelve las claves de l
   pruebas que fijen el comportamiento nuevo.
 - No agregar dependencias sin justificarlo; cada una es mantenimiento para una persona.
 - Nada de datos reales de clientes (IPs, nombres de sitios) en el repositorio ni en fixtures.
+- `docs/plantillas/base_conocimiento.csv` se copia a `central/src/idcmd_central/servicio/`;
+  editar la de `docs/` y volver a copiar (una prueba exige que sean idénticas).
 
 ## Estado
 
@@ -184,4 +188,5 @@ Dahua: **nunca** usar `configManager.cgi` (RemoteDevice devuelve las claves de l
 | E2 | Adaptadores Hikvision acceso, Dahua acceso/cámara/NVR/retención + `idcmd sondear` | ✅ Entrega 3b (validar en oficina) |
 | E1 | Portal mínimo con login MFA y estado en vivo + modo laboratorio | ✅ Entrega 4 (probado de punta a punta en contenedores; falta en la oficina) |
 | E3 | Servicio parte 1: tickets automáticos, asignación/escalamiento, SLA, avisos, seguimiento | ✅ Entrega 5 (probado de punta a punta en contenedores) |
-| E3–E6 | Servicio partes 2–3 (PWA técnico, acta PDF), informe SLA mensual, piloto | Pendiente |
+| E3 | Servicio parte 2: PWA del técnico (llegada con ubicación, pasos, fotos, firma, acta) | ✅ Entrega 6 (probado en celular emulado con GPS) |
+| E3–E6 | Servicio parte 3 (acta PDF, encuesta), informe SLA mensual, piloto | Pendiente |

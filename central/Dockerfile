@@ -15,6 +15,9 @@ RUN uv sync --locked --no-dev --no-editable
 FROM ${IMAGEN_BASE}
 RUN groupadd --system --gid 10001 idcmd \
     && useradd --system --uid 10001 --gid 10001 --home-dir /nonexistent --shell /usr/sbin/nologin idcmd
+# Fotos y firmas de los servicios (volumen): con dueño 10001 para que un volumen nuevo herede
+# la propiedad y la central pueda escribir.
+RUN mkdir -p /datos/archivos && chown -R 10001:10001 /datos
 COPY --from=construccion /repo/central/.venv /repo/central/.venv
 COPY central/migraciones /app/migraciones
 ENV PATH=/repo/central/.venv/bin:$PATH PYTHONUNBUFFERED=1 IDCMD_MIGRACIONES=/app/migraciones

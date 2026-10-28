@@ -12,13 +12,15 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from .db import BaseDatos
 from .ingesta.api import router as router_ingesta
+from .portal.campo import router as router_campo
 from .portal.rutas import router as router_portal
 
 # El portal no carga nada de terceros: htmx y la hoja de estilos se sirven desde aquí.
 CABECERAS_PORTAL = {
     "Content-Security-Policy": (
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+        "img-src 'self' data: blob:; frame-ancestors 'none'; base-uri 'none'; "
+        "form-action 'self'; worker-src 'self'; manifest-src 'self'"
     ),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "same-origin",
@@ -55,6 +57,7 @@ def crear_app(bd: BaseDatos | None = None) -> FastAPI:
         app.state.bd = bd
     app.include_router(router_ingesta)
     app.include_router(router_portal)
+    app.include_router(router_campo)
     app.mount(
         "/portal/estaticos",
         StaticFiles(directory=Path(__file__).parent / "portal" / "estaticos"),

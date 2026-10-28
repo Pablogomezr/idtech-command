@@ -49,3 +49,9 @@ administradores, que pueden "Tomar este servicio".
 - Telegram: crear un bot con @BotFather, poner `IDCMD_TELEGRAM_TOKEN=...` en `lab.env`, y vincular
   cada usuario: `idcmd-central usuarios telegram --correo ... --chat-id <id>` (el id lo da @userinfobot).
 - Sin correo ni Telegram configurados, los avisos se ven en el portal, menú "Avisos".
+
+## App del técnico en el celular
+- En el laboratorio el portal solo escucha en este PC (127.0.0.1). Para probar desde el celular
+  en la misma red, la ubicación y la instalación como app exigen HTTPS: se habilita con el
+  despliegue en la nube (OCI) o con un túnel HTTPS; mientras tanto se prueba en el navegador del PC.
+- Para confirmar la llegada, el sitio necesita `lat` y `lon` en `inventario.yaml`.

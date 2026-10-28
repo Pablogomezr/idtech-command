@@ -141,3 +141,36 @@ ol.pasos { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6p
 ol.pasos li { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--nd-f); color: var(--nd); }
 ol.pasos li.hecho { background: var(--ok-f); color: var(--ok); }
 ol.pasos li.actual { background: var(--marca); color: #fff; font-weight: 600; }
+
+/* Campo: pasos, fotos, firma y acta. */
+ol.lista-pasos { list-style: none; padding: 0; margin: 0; }
+ol.lista-pasos li { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; padding: 8px 0;
+  border-bottom: 1px solid var(--borde); }
+ol.lista-pasos li:last-child { border-bottom: 0; }
+ol.lista-pasos .icono { width: 18px; font-weight: 700; }
+ol.lista-pasos .texto { flex: 1 1 200px; }
+.paso-hecho .icono { color: var(--ok); }
+.paso-no_aplica { color: var(--suave); }
+.botones-paso { display: flex; gap: 6px; }
+.botones-paso form { margin: 0; }
+.galeria { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.galeria img { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid var(--borde); }
+.galeria figure { margin: 0; font-size: 12px; color: var(--suave); }
+.subir-foto input[type=text], #firma input[type=text] { width: 100%; padding: 10px; font-size: 16px; margin: 6px 0;
+  border: 1px solid var(--borde); border-radius: 8px; background: var(--fondo); color: var(--texto); }
+.subir-foto input[type=file] { margin: 6px 0; max-width: 100%; }
+canvas.lienzo-firma { width: 100%; max-width: 600px; height: auto; aspect-ratio: 3 / 1; background: #fff;
+  border: 1px dashed var(--borde); border-radius: 8px; touch-action: none; display: block; margin: 6px 0; }
+img.firma { max-width: 300px; width: 100%; background: #fff; border-radius: 6px; border: 1px solid var(--borde); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.acta-cab { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--texto);
+  padding-bottom: 8px; margin-bottom: 10px; }
+.acta-num { font-size: 18px; font-weight: 700; }
+table.acta-datos th { width: 18%; }
+.acta-firma { margin-top: 24px; border-top: 1px solid var(--borde); padding-top: 12px; }
+@media print {
+  header.barra, .no-imprimir { display: none !important; }
+  body { background: #fff; color: #000; }
+  main { max-width: none; padding: 0; }
+  .galeria img { width: 160px; height: 160px; }
+}

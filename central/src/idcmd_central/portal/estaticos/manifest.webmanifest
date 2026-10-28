@@ -1,0 +1,16 @@
+{
+  "name": "IDtech Command",
+  "short_name": "IDtech",
+  "description": "Monitoreo y servicio técnico de CCTV y control de acceso",
+  "lang": "es-CO",
+  "start_url": "/portal/tickets",
+  "scope": "/portal/",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#0b5cad",
+  "icons": [
+    {"src": "/portal/estaticos/icono-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/portal/estaticos/icono-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "/portal/estaticos/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

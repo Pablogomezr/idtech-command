@@ -51,6 +51,7 @@ services:
       IDCMD_COOKIE_SEGURA: "false"   # solo laboratorio: http://localhost
       IDCMD_URL_PUBLICA: ${IDCMD_URL_PUBLICA:-http://localhost:8000}
     ports: ["127.0.0.1:8000:8000"]   # solo desde este PC
+    volumes: [archivos:/datos/archivos]   # fotos y firmas de los servicios
     sysctls:
       # El agente comparte esta red: ping sin privilegios para el adaptador icmp.
       net.ipv4.ping_group_range: "0 2147483647"
@@ -92,3 +93,4 @@ services:
 volumes:
   bd:
   agente_datos:
+  archivos:

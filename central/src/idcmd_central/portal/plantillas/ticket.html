@@ -25,21 +25,102 @@
 {% if puede_actuar and t.estado in ACCIONES_TICKET %}
 <div class="tarjeta">
   <h2 style="margin-top:0">Actualizar el servicio</h2>
+  {% if t.sitio_lat and t.sitio_lon %}
+  <p><a href="https://www.google.com/maps/dir/?api=1&destination={{ t.sitio_lat }},{{ t.sitio_lon }}" rel="noopener" target="_blank">📍 Cómo llegar a {{ t.sitio }}</a>{% if t.sitio_direccion %} <span class="vivo">· {{ t.sitio_direccion }}</span>{% endif %}</p>
+  {% elif t.sitio_direccion %}<p class="vivo">Dirección: {{ t.sitio_direccion }}{% if t.sitio_ciudad %}, {{ t.sitio_ciudad }}{% endif %}</p>{% endif %}
   <div class="botones">
   {% for accion, texto in ACCIONES_TICKET[t.estado] %}
     {% if accion != 'tomar' or t.tecnico_id != usuario.id %}
     <form method="post" action="/portal/tickets/{{ t.id }}/accion">
       <input type="hidden" name="accion" value="{{ accion }}">
-      <button type="submit" class="{% if accion == 'tomar' %}discreto{% endif %}">{{ texto }}</button>
+      <button type="submit" class="{% if accion == 'tomar' and ACCIONES_TICKET[t.estado]|length > 1 %}discreto{% endif %}">{{ texto }}</button>
     </form>
     {% endif %}
   {% endfor %}
+  {% if en_campo and t.estado in ['aceptado', 'en_camino'] %}
+    <form method="post" action="/portal/tickets/{{ t.id }}/llegada" data-geolocalizar>
+      <input type="hidden" name="lat"><input type="hidden" name="lon"><input type="hidden" name="precision">
+      <button type="submit">📍 Llegué al sitio</button>
+    </form>
+  {% endif %}
+  {% if en_campo %}
+    <form method="post" action="/portal/tickets/{{ t.id }}/accion">
+      <input type="hidden" name="accion" value="resuelto">
+      <button type="submit" {% if pendientes %}disabled title="Complete la lista de pasos"{% endif %}>✓ Resuelto</button>
+    </form>
+  {% endif %}
   </div>
-  {% if t.estado in ['aceptado', 'en_camino', 'en_sitio'] %}
-  <div class="vivo" style="margin-top:6px">Al marcar "Resuelto", el sistema verifica que el equipo lleve 10 minutos funcionando antes de cerrar el ticket.</div>
+  {% if en_campo and t.estado in ['aceptado', 'en_camino'] %}
+  <div class="vivo" style="margin-top:6px">"Llegué al sitio" pide la ubicación del celular solo en ese momento, para confirmar la visita.</div>
+  {% endif %}
+  {% if en_campo %}
+  <div class="vivo" style="margin-top:6px">{% if pendientes %}Faltan {{ pendientes }} paso(s) de la lista para poder marcar "Resuelto". {% endif %}Al marcar "Resuelto", el sistema verifica que el equipo lleve 10 minutos funcionando antes de cerrar el ticket.</div>
   {% endif %}
 </div>
 {% endif %}
+
+{% if pasos %}
+<div class="tarjeta" id="pasos">
+  <h2 style="margin-top:0">Lista de pasos</h2>
+  <ol class="lista-pasos">
+  {% for p in pasos %}
+    <li class="paso-{{ p.estado }}">
+      <span class="icono">{{ {'hecho': '✓', 'no_aplica': '–', 'pendiente': '○'}[p.estado] }}</span>
+      <span class="texto">{{ p.texto }}{% if p.estado != 'pendiente' %} <span class="vivo">· {{ 'hecho' if p.estado == 'hecho' else 'no aplica' }} {{ p.marcado_at|hora('%H:%M') }}</span>{% endif %}</span>
+      {% if en_campo %}
+      <span class="botones-paso">
+        {% for est, txt in ([('hecho', 'Hecho'), ('no_aplica', 'No aplica')] if p.estado == 'pendiente' else [('pendiente', 'Deshacer')]) %}
+        <form method="post" action="/portal/tickets/{{ t.id }}/pasos/{{ p.id }}">
+          <input type="hidden" name="estado" value="{{ est }}"><button type="submit" class="discreto">{{ txt }}</button>
+        </form>
+        {% endfor %}
+      </span>
+      {% endif %}
+    </li>
+  {% endfor %}
+  </ol>
+</div>
+{% endif %}
+
+{% if archivos or en_campo %}
+<div class="tarjeta" id="fotos">
+  <h2 style="margin-top:0">Fotos del trabajo</h2>
+  <div class="galeria">
+    {% for a in archivos if a.tipo == 'foto' %}
+    <a href="/portal/archivos/{{ a.id }}" target="_blank"><img src="/portal/archivos/{{ a.id }}" alt="Foto {{ loop.index }}" loading="lazy"></a>
+    {% else %}<span class="vivo">Aún no hay fotos.</span>{% endfor %}
+  </div>
+  {% if en_campo %}
+  <form method="post" action="/portal/tickets/{{ t.id }}/fotos" enctype="multipart/form-data" data-comprimir class="subir-foto">
+    <label class="vivo" for="foto">Tome la foto del equipo (no de personas). Se reduce en el celular antes de enviarla.</label>
+    <input id="foto" type="file" name="foto" accept="image/jpeg,image/png" capture="environment" required>
+    <input type="text" name="nota" maxlength="300" placeholder="Nota de la foto (opcional), p. ej. 'antes' o 'después'">
+    <button type="submit">Subir foto</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+{% set firma = (archivos | selectattr('tipo', 'equalto', 'firma') | list | last) %}
+{% if firma or en_campo %}
+<div class="tarjeta" id="firma">
+  <h2 style="margin-top:0">Recibido a satisfacción</h2>
+  {% if firma %}
+    <p>Firmó: <b>{{ t.recibido_por }}</b> <span class="vivo">· {{ t.firmado_at|hora('%d/%m %H:%M') }}</span></p>
+    <img class="firma" src="/portal/archivos/{{ firma.id }}" alt="Firma de {{ t.recibido_por }}">
+  {% endif %}
+  {% if en_campo %}
+  <form method="post" action="/portal/tickets/{{ t.id }}/firma" enctype="multipart/form-data" data-firma>
+    <input type="text" name="recibido_por" minlength="3" maxlength="120" required placeholder="Nombre de quien recibe el trabajo">
+    <canvas class="lienzo-firma" width="600" height="200" aria-label="Firme aquí con el dedo"></canvas>
+    <div class="botones"><button type="button" class="discreto" data-borrar>Borrar</button><button type="submit">Guardar firma</button></div>
+    <noscript><p class="vivo">La firma necesita JavaScript activo.</p></noscript>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+<p><a href="/portal/tickets/{{ t.id }}/acta">📄 Ver acta del servicio</a> <span class="vivo">(se puede imprimir o guardar como PDF)</span></p>
 
 <h2>Línea de tiempo</h2>
 <ol class="linea-tiempo">

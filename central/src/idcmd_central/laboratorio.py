@@ -9,6 +9,9 @@ inventario de la central). Los identificadores de los equipos son deterministas
     regional: Barranquilla
     sitio: Oficina IDtech
     ciudad: Barranquilla
+    direccion: Calle 00 # 00-00          # opcional: "Cómo llegar" para el técnico
+    lat: 10.9878                         # opcional: confirma la llegada del técnico
+    lon: -74.7889
     dispositivos:
       - clave: nvr
         nombre: NVR oficina
@@ -109,6 +112,19 @@ def cargar(dsn_dueno: str, datos: dict) -> Resultado:
             " VALUES (%s, %s, %s, %s) RETURNING id",
             (cliente, datos["sitio"]),
             (cliente, regional, datos["sitio"], datos.get("ciudad")),
+        )
+        # Dirección y coordenadas: "Cómo llegar" del técnico y confirmación de la llegada.
+        con.execute(
+            "UPDATE idcmd.sitios SET ciudad = coalesce(%s, ciudad),"
+            " direccion = coalesce(%s, direccion), lat = coalesce(%s, lat),"
+            " lon = coalesce(%s, lon) WHERE id = %s",
+            (
+                datos.get("ciudad"),
+                datos.get("direccion"),
+                datos.get("lat"),
+                datos.get("lon"),
+                sitio,
+            ),
         )
         ids = {}
         for d in datos["dispositivos"]:

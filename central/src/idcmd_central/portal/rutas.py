@@ -286,6 +286,8 @@ async def ver_ticket(request: Request, ticket_id: uuid.UUID, error: str | None =
         if t is None:
             raise HTTPException(status_code=404)
         eventos = await consultas.eventos_ticket(con, ticket_id)
+        pasos = await consultas.pasos_ticket(con, ticket_id)
+        archivos = await consultas.archivos_ticket(con, ticket_id)
         await consultas.auditar(
             con, usuario_id, "ver", f"/portal/tickets/{ticket_id}", _ip(request)
         )
@@ -293,12 +295,17 @@ async def ver_ticket(request: Request, ticket_id: uuid.UUID, error: str | None =
         usuario["rol"] == "tecnico"
         and (t["tecnico_id"] == usuario_id or t["estado"] in ("abierto", "asignado"))
     )
+    # Trabajo en campo (llegada, pasos, fotos, firma): el asignado o un administrador.
+    en_campo = t["estado"] in ("aceptado", "en_camino", "en_sitio") and (
+        usuario["rol"] == "admin" or (usuario["rol"] == "tecnico" and t["tecnico_id"] == usuario_id)
+    )
     return _pagina(
         request,
         "ticket.html",
         {
             "usuario": usuario, "t": t, "eventos": eventos, "puede_actuar": puede_actuar,
-            "error": (error or "")[:200],
+            "error": (error or "")[:200], "pasos": pasos, "archivos": archivos,
+            "en_campo": en_campo, "pendientes": sum(p["estado"] == "pendiente" for p in pasos),
         },
     )  # fmt: skip
 
@@ -359,4 +366,11 @@ async def seguimiento(request: Request, ticket_id: uuid.UUID, firma: str):
             )
     if not fila:
         raise HTTPException(status_code=404)
-    return _pagina(request, "seguimiento.html", {"t": dict(zip(nombres, fila, strict=True))})
+    return _pagina(
+        request,
+        "seguimiento.html",
+        {
+            "t": dict(zip(nombres, fila, strict=True)),
+            "acta": f"/seguimiento/{ticket_id}/{firma}/acta",
+        },
+    )

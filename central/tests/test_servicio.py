@@ -58,6 +58,13 @@ def _eventos(dueno, ticket_id):
     ]
 
 
+def _completar_pasos(dueno, ticket_id):
+    dueno.execute(
+        "UPDATE idcmd.pasos_ticket SET estado = 'hecho', marcado_at = now() WHERE ticket_id = %s",
+        (ticket_id,),
+    )
+
+
 @pytest.fixture
 def contacto(dueno, datos):
     dueno.execute(
@@ -133,8 +140,11 @@ async def test_resuelto_se_cierra_solo_con_el_equipo_verificado(bd, dueno, datos
     await ciclo(bd, T0 + timedelta(minutes=1), enviar=False)
     tid = _ticket(dueno, datos)[6]
     async with bd.como_usuario(datos["u_tecnico_1"]) as con:
-        for accion in ("aceptar", "en_camino", "en_sitio", "resuelto"):
+        for accion in ("aceptar", "en_camino", "en_sitio"):
             await con.execute("SELECT idcmd.accion_ticket(%s, %s)", (tid, accion))
+    _completar_pasos(dueno, tid)
+    async with bd.como_usuario(datos["u_tecnico_1"]) as con:
+        await con.execute("SELECT idcmd.accion_ticket(%s, 'resuelto')", (tid,))
     # El técnico dice "resuelto" pero el equipo sigue caído: no se cierra.
     await ciclo(bd, T0 + timedelta(minutes=5), enviar=False)
     assert _ticket(dueno, datos)[0] == "resuelto"
@@ -150,6 +160,7 @@ async def test_resuelto_pero_sigue_mal_se_reabre(bd, dueno, datos):
     _falla(dueno, datos)
     await ciclo(bd, T0 + timedelta(minutes=1), enviar=False)
     tid = _ticket(dueno, datos)[6]
+    _completar_pasos(dueno, tid)
     async with bd.como_usuario(datos["u_tecnico_1"]) as con:
         await con.execute("SELECT idcmd.accion_ticket(%s, 'aceptar')", (tid,))
         await con.execute("SELECT idcmd.accion_ticket(%s, 'resuelto')", (tid,))

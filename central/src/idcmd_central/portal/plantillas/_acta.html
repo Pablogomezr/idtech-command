@@ -1,0 +1,26 @@
+<div class="acta">
+  <div class="acta-cab">
+    <div><b>Ingeniería y Desarrollo IDtech SAS</b><div class="vivo">Acta de servicio técnico</div></div>
+    <div class="acta-num">Servicio #{{ t.numero }}</div>
+  </div>
+  <table class="acta-datos">
+    <tr><th>Sitio</th><td>{{ t.sitio }}</td><th>Equipo</th><td>{{ t.equipo or 'Sitio completo' }}</td></tr>
+    <tr><th>Falla</th><td>{{ t.titulo }}</td><th>Prioridad</th><td>{{ PRIORIDADES[t.prioridad] }}</td></tr>
+    <tr><th>Falla desde</th><td>{{ t.abierto_at|hora('%d/%m/%Y %H:%M') }}</td><th>Estado</th><td>{{ ESTADOS_TICKET[t.estado] }}</td></tr>
+    <tr><th>Técnico</th><td>{{ t.tecnico or '—' }}</td><th>Llegada</th><td>{% if t.en_sitio_at %}{{ t.en_sitio_at|hora('%d/%m %H:%M') }}{% if t.llegada_distancia_m is not none %} (a {{ t.llegada_distancia_m }} m){% endif %}{% else %}—{% endif %}</td></tr>
+    <tr><th>Atención comprometida</th><td>{{ t.vence_respuesta_at|hora('%d/%m %H:%M') }}</td><th>Solución comprometida</th><td>{{ t.vence_solucion_at|hora('%d/%m %H:%M') }}</td></tr>
+  </table>
+  <h2>Trabajo realizado</h2>
+  <ol class="lista-pasos">{% for p in pasos %}<li class="paso-{{ p.estado }}"><span class="icono">{{ {'hecho': '✓', 'no_aplica': '–', 'pendiente': '○'}[p.estado] }}</span><span class="texto">{{ p.texto }}{% if p.estado == 'no_aplica' %} <span class="vivo">(no aplica)</span>{% endif %}</span></li>{% else %}<li>—</li>{% endfor %}</ol>
+  {% set fotos = archivos | selectattr('tipo', 'equalto', 'foto') | list %}
+  {% if fotos %}<h2>Fotos</h2><div class="galeria">{% for a in fotos %}<figure><img src="{{ url_archivo(a) }}" alt="Foto {{ loop.index }}">{% if a.nota %}<figcaption>{{ a.nota }}</figcaption>{% endif %}</figure>{% endfor %}</div>{% endif %}
+  <h2>Historial</h2>
+  <ol class="linea-tiempo">{% for e in eventos %}<li><span class="vivo">{{ e.at|hora('%d/%m %H:%M') if e.at is not string else e.at|hora_iso }}</span> {{ e.texto }}</li>{% endfor %}</ol>
+  {% set firma = archivos | selectattr('tipo', 'equalto', 'firma') | list | last %}
+  <div class="acta-firma">
+    {% if firma %}<img class="firma" src="{{ url_archivo(firma) }}" alt="Firma">{% endif %}
+    <div>Recibido a satisfacción: <b>{{ t.recibido_por or '________________________' }}</b>
+      {% if t.firmado_at %}<span class="vivo">· {{ t.firmado_at|hora('%d/%m/%Y %H:%M') }}</span>{% endif %}</div>
+  </div>
+  <p class="vivo no-imprimir"><a href="#" data-imprimir>🖨 Imprimir o guardar como PDF</a></p>
+</div>
