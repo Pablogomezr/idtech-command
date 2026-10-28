@@ -18,6 +18,24 @@ Al final vas a tener:
 Los nombres de los botones pueden cambiar un poco porque Oracle actualiza la consola. Si alguno no
 coincide, busca el más parecido.
 
+## Ruta rápida (recomendada)
+
+Haz a mano solo los pasos **1, 2 y 5**: la cuenta, Pay As You Go y la llave SSH. Los pasos 3, 4,
+6, 7 y 10 los hace un script en **Cloud Shell**, la terminal que trae la consola de Oracle (ícono
+`>_` arriba a la derecha). Cloud Shell ya entra con tu usuario, así que el script no pide claves.
+
+1. Verifica que la región de la consola sea **Colombia Central (Bogota)** y abre Cloud Shell.
+2. En el menú del engranaje de Cloud Shell, elige **Upload** y sube
+   `despliegue/oci/crear-infraestructura.sh`.
+3. Ejecuta `bash crear-infraestructura.sh`. Te pide dos datos:
+   - tu llave **pública** SSH;
+   - la IP pública de la oficina.
+4. Al final muestra la IP del servidor. Con ella haz el paso 8 (dominio) y el 9 (probar la
+   entrada).
+
+Si algo falla a mitad de camino, puedes repetir el script: lo que ya existe se reutiliza. Los pasos
+manuales de abajo quedan como referencia.
+
 ---
 
 ## 1. Crear la cuenta (≈20 min + verificación)
