@@ -430,6 +430,15 @@ _BUSQUEDA = """<?xml version="1.0" encoding="UTF-8"?>
 </CMSearchDescription>"""
 
 MAJOR_OPERACION = 3
+# Variantes del cuerpo de AcsEvent: (hora con desfase "-05:00", incluir "minor": 0). El
+# DS-K2602T fw V1.1.1 rechaza la primera con badJsonContent; la documentación pública no
+# dice cuál espera cada firmware, así que se prueban en orden y se recuerda la que sirve.
+_VARIANTES_ACS: list[tuple[bool, bool]] = [
+    (True, True),
+    (False, True),
+    (True, False),
+    (False, False),
+]
 # Subtipos de operación de Hikvision (HCNetSDK). Se traducen a un nombre en inglés que
 # `clasificar` entiende; un subtipo desconocido viaja como "minor_0x.." para descubrirlo.
 _MINOR_HIKVISION = {
@@ -510,6 +519,10 @@ class AdaptadorHikvisionRegistro(_BaseRegistro):
 
     chequeo = "hikvision_registro"
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._variante_acs: dict[uuid.UUID, int] = {}
+
     async def chequear(self, objetivo: Objetivo, credencial: Credencial | None):
         if credencial is None:
             return [self._resultado(objetivo, Estado.DESCONOCIDO, "credencial_requerida")]
@@ -526,7 +539,7 @@ class AdaptadorHikvisionRegistro(_BaseRegistro):
         try:
             entradas = await self._log_search(cliente, inicio, fin, zona)
             if entradas is None:
-                entradas = await self._acs_event(cliente, inicio, fin, zona)
+                entradas = await self._acs_event(cliente, objetivo, inicio, fin, zona)
         except (ET.ParseError, ValueError):
             return [self._resultado(objetivo, Estado.DESCONOCIDO, "respuesta_no_reconocida")]
         except httpx.TransportError:
@@ -595,30 +608,48 @@ class AdaptadorHikvisionRegistro(_BaseRegistro):
             for e in crudas
         ]
 
+    async def _acs_event(self, cliente, objetivo, inicio, fin, zona) -> list[dict] | None:
+        """Prueba las variantes de `_VARIANTES_ACS` hasta que una responda 200 y la recuerda
+        por equipo. Un 400 por formato no es un intento de clave fallido: no bloquea."""
+        conocida = self._variante_acs.get(objetivo.dispositivo_id)
+        orden = [conocida] if conocida is not None else range(len(_VARIANTES_ACS))
+        for indice in orden:
+            entradas = await self._acs_event_con(cliente, _VARIANTES_ACS[indice], inicio, fin, zona)
+            if entradas is not None:
+                self._variante_acs[objetivo.dispositivo_id] = indice
+                return entradas
+        self._variante_acs.pop(objetivo.dispositivo_id, None)
+        return None
+
     @staticmethod
-    async def _acs_event(cliente, inicio, fin, zona) -> list[dict] | None:
-        formato = "%Y-%m-%dT%H:%M:%S%z"
+    async def _acs_event_con(cliente, variante, inicio, fin, zona) -> list[dict] | None:
+        con_desfase, con_minor = variante
 
         def hora(momento: datetime) -> str:
-            t = momento.astimezone(zona).strftime(formato)
+            local = momento.astimezone(zona)
+            if not con_desfase:
+                return local.strftime("%Y-%m-%dT%H:%M:%S")
+            t = local.strftime("%Y-%m-%dT%H:%M:%S%z")
             return f"{t[:-2]}:{t[-2:]}"  # -0500 -> -05:00
 
         entradas: list[dict] = []
-        posicion, id_busqueda = 0, str(uuid.uuid4())
+        posicion, id_busqueda = 0, uuid.uuid4().hex
         while len(entradas) < MAX_ENTRADAS:
-            cuerpo = {
-                "AcsEventCond": {
-                    "searchID": id_busqueda,
-                    "searchResultPosition": posicion,
-                    "maxResults": 30,
-                    "major": MAJOR_OPERACION,  # nunca 5 (marcaciones) ni 0 (todo)
-                    "minor": 0,
-                    "startTime": hora(inicio),
-                    "endTime": hora(fin),
-                }
+            condicion = {
+                "searchID": id_busqueda,
+                "searchResultPosition": posicion,
+                "maxResults": 30,
+                "major": MAJOR_OPERACION,  # nunca 5 (marcaciones) ni 0 (todo)
+                "startTime": hora(inicio),
+                "endTime": hora(fin),
             }
+            if con_minor:
+                condicion["minor"] = 0
             r = await cliente.solicitar(
-                "POST", "/ISAPI/AccessControl/AcsEvent", params={"format": "json"}, json=cuerpo
+                "POST",
+                "/ISAPI/AccessControl/AcsEvent",
+                params={"format": "json"},
+                json={"AcsEventCond": condicion},
             )
             if r.status_code != 200:
                 if posicion == 0:

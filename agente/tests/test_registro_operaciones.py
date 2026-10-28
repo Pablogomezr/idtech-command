@@ -532,3 +532,30 @@ async def test_hikvision_panel_sin_logsearch_usa_acs_event_solo_operaciones():
     assert pedido["major"] == 3  # nunca 5 (marcaciones)
     texto = " ".join(o.model_dump_json() for o in ops)
     assert "Juan" not in texto and "1234567890" not in texto
+
+
+async def test_acs_event_prueba_variantes_y_recuerda_la_que_sirve():
+    """El DS-K2602T rechazó con badJsonContent la hora con desfase: se prueban variantes."""
+    vistos = []
+
+    def responder(request):
+        cond = json.loads(request.content)["AcsEventCond"]
+        vistos.append(cond)
+        if cond["startTime"].endswith("-05:00"):
+            return httpx.Response(400, json={"subStatusCode": "badJsonContent"})
+        return httpx.Response(200, json=ACS_EVENT)
+
+    reloj = RelojFalso(AHORA)
+    objetivo = _objetivo("hikvision_registro", PANEL_IP)
+    with respx.mock() as mock:
+        mock.post(f"http://{PANEL_IP}/ISAPI/ContentMgmt/logSearch").respond(400)
+        mock.post(f"http://{PANEL_IP}/ISAPI/AccessControl/AcsEvent").mock(side_effect=responder)
+        async with httpx.AsyncClient() as cliente:
+            adaptador = AdaptadorHikvisionRegistro(cliente_http=cliente, reloj=reloj)
+            estado, *ops = await adaptador.chequear(objetivo, CRED)
+            assert estado.estado == Estado.OK and len(ops) == 3
+            assert len(vistos) == 2  # la primera variante falló, la segunda sirvió
+            reloj.avanzar(300)
+            await adaptador.chequear(objetivo, CRED)
+    assert len(vistos) == 3  # la segunda lectura va directo a la variante que sirvió
+    assert all(c["major"] == 3 for c in vistos)
