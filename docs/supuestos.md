@@ -103,8 +103,15 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
 - Panel DS-K2602T con `admin` (2026-10-28): no admite otros usuarios (iVMS solo edita
   `admin`); se usa con `cuenta_compartida` (ADR 0009). Salud ok; se vieron en real los
   cambios de Pablo (modos 7,3,3,3 -> 7,7,7,7; usuarios 1 -> 2) y el reloj atrasado 165 s
-  con NTP apagado. `ContentMgmt/logSearch` responde 400: se agregó `AccessControl/AcsEvent`
-  con major 3 (solo operaciones). Pendiente: validar AcsEvent y los subtipos reales.
+  con NTP apagado. `ContentMgmt/logSearch` responde 400 (notSupport).
+- Auditoría del panel validada (v19, 2026-10-28): `AccessControl/AcsEvent` con major 3
+  devolvió 28 operaciones en 24 h, sin una sola marcación. Subtipos reales: 112 inicio de
+  sesión, 113 cierre, 121/122 armar/desarmar (iVMS se suscribe a eventos al conectarse),
+  1028 sincronización de hora. El `badJsonContent` inicial era el `searchID` con guiones.
+  El panel NO anota los cambios de configuración (modos 7,3,3,3 -> 7,7,7,7 y el usuario
+  nuevo no aparecen en su registro): en este equipo esos cambios se auditan por las
+  instantáneas (historial de métricas), que sí los detectaron. Las consultas del agente
+  (ISAPI con digest) no generan inicios de sesión: no ensucian la auditoría.
 
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.

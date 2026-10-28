@@ -118,7 +118,7 @@ IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "
 | `hikvision_acceso` | Paneles/terminales Hikvision (ISAPI) | Modelo, firmware, serie, reloj, zona horaria, NTP, tamper, lectoras, batería | ✅ Validado en oficina: DS-K2602T, fw V1.1.1 (2023-09-16), http |
 | `dahua_acceso` / `dahua_camara` | Controladoras y cámaras Dahua (CGI) | Modelo, firmware, serie, reloj | Validar con equipo real |
 | `dahua_nvr` | NVR Dahua (de sistema, con `canales`) | Identidad, discos, uso, cámara conectada por canal | ✅ Validado en oficina con `idcmd_monitor`: DHI-NVR5432-EI, fw 5.001 (2026-03-31), http |
-| `dahua_registro` / `hikvision_registro` | Registro de operaciones (ADR 0009) | Quién entró (cuenta, IP) y qué hizo; descarta eventos (IVS, audio, alarmas) | Dahua ✅ oficina (NVR5432, fw 5.001): IP en `Detail`, login en 2 entradas, textos en español. Hikvision: validar |
+| `dahua_registro` / `hikvision_registro` | Registro de operaciones (ADR 0009) | Quién entró (cuenta, IP) y qué hizo; descarta eventos (IVS, audio, alarmas) | Dahua ✅ oficina (NVR5432, fw 5.001): IP en `Detail`, login en 2 entradas, textos en español. Hikvision ✅ panel DS-K2602T vía `AcsEvent` major 3 (no tiene logSearch ni anota cambios de configuración: esos los cubren las instantáneas) |
 | `dahua_retencion` | NVR Dahua (`deteccion: false`, cada 15 min) | Retención real y proyectada por cámara vs contratada; grabación reciente por canal | ✅ Validado en oficina: 120,3 reales / 226,6 proyectados; el filtro por canal funciona (respuesta numerada desde 0) |
 | `simulado` | Demos | Caídas ficticias reproducibles | — |
 

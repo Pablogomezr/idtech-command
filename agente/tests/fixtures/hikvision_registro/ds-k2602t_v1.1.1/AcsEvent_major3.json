@@ -1,0 +1,19 @@
+{
+"AcsEvent" : {
+"searchID": "f173835ffac149c4bf38f90fdb43677e",
+"responseStatusStrg": "OK",
+"numOfMatches": 9,
+"totalMatches": 9,
+"InfoList" : [
+{"major": 3, "minor": 1028, "time": "2026-10-27T12:18:37-05:00", "netUser": "admin", "remoteHostAddr": "10.20.30.9", "deviceNo": 0, "serialNo": 53, "type": 0},
+{"major": 3, "minor": 1028, "time": "2026-10-27T12:18:37-05:00", "netUser": "admin", "remoteHostAddr": "10.20.30.9", "deviceNo": 0, "serialNo": 54, "type": 0},
+{"major": 3, "minor": 113, "time": "2026-10-27T12:20:37-05:00", "netUser": "admin", "remoteHostAddr": "10.20.30.9", "deviceNo": 0, "serialNo": 57, "type": 0},
+{"major": 3, "minor": 112, "time": "2026-10-27T14:16:55-05:00", "netUser": "admin", "remoteHostAddr": "10.20.30.9", "deviceNo": 0, "serialNo": 85, "type": 0},
+{"major": 3, "minor": 121, "time": "2026-10-27T14:16:57-05:00", "netUser": "admin", "remoteHostAddr": "10.20.30.9", "deviceNo": 0, "serialNo": 86, "type": 0},
+{"major": 3, "minor": 122, "time": "2026-10-27T19:26:15-05:00", "deviceNo": 0, "serialNo": 97, "type": 0},
+{"major": 3, "minor": 113, "time": "2026-10-27T19:30:07-05:00", "netUser": "admin", "remoteHostAddr": "10.20.30.9", "deviceNo": 0, "serialNo": 98, "type": 0},
+{"major": 3, "minor": 112, "time": "2026-10-28T09:14:31-05:00", "netUser": "admin", "remoteHostAddr": "10.20.30.9", "deviceNo": 0, "serialNo": 115, "type": 0},
+{"major": 3, "minor": 122, "time": "2026-10-28T09:15:20-05:00", "netUser": "admin", "remoteHostAddr": "10.20.30.9", "deviceNo": 0, "serialNo": 117, "type": 0}
+]
+}
+}

@@ -162,6 +162,7 @@ def construir_operacion(
     ip: str | None,
     cuenta_agente: str | None,
     ip_agente: str | None = None,
+    serie: str | None = None,
 ) -> OperacionEquipo | None:
     if es_evento(texto_tipo):
         return None
@@ -175,7 +176,13 @@ def construir_operacion(
             return None
     cuenta_txt, codigo = texto_seguro(cuenta), texto_seguro(texto_tipo)
     ip_txt = _ip(ip)
-    clave = f"{dispositivo}|{ocurrido.isoformat()}|{codigo}|{cuenta_txt}|{ip_txt}"
+    # Con número de serie del equipo, ese es el identificador: el DS-K2602T anota varias
+    # sincronizaciones de hora en el mismo segundo y sin él colapsaban en una.
+    clave = (
+        f"{dispositivo}|serie|{serie}"
+        if serie
+        else f"{dispositivo}|{ocurrido.isoformat()}|{codigo}|{cuenta_txt}|{ip_txt}"
+    )
     return OperacionEquipo(
         id=uuid.uuid5(_NS, clave),
         dispositivo_id=dispositivo,
@@ -431,8 +438,9 @@ _BUSQUEDA = """<?xml version="1.0" encoding="UTF-8"?>
 
 MAJOR_OPERACION = 3
 # Variantes del cuerpo de AcsEvent: (hora con desfase "-05:00", incluir "minor": 0). El
-# DS-K2602T fw V1.1.1 rechaza la primera con badJsonContent; la documentación pública no
-# dice cuál espera cada firmware, así que se prueban en orden y se recuerda la que sirve.
+# DS-K2602T fw V1.1.1 acepta la primera; su badJsonContent inicial era el `searchID` con
+# guiones (uuid4 de 36 caracteres): va en hex de 32. Las demás quedan de respaldo para
+# firmwares que no acepten el desfase o el minor, y se recuerda la que sirve por equipo.
 _VARIANTES_ACS: list[tuple[bool, bool]] = [
     (True, True),
     (False, True),
@@ -454,6 +462,10 @@ _MINOR_HIKVISION = {
     0x76: "remoteGetParm",
     0x77: "remoteCfgParm",
     0x78: "remoteGetStatus",
+    # "Armar" = un cliente (iVMS) se suscribe a los eventos del equipo al conectarse;
+    # "desarmar" = se desuscribe. Visto en la oficina en cada sesión de iVMS.
+    0x79: "remoteArm",
+    0x7A: "remoteDisarm",
     0x7B: "remoteReboot",
     0x7E: "remoteUpgrade",
     0x86: "remoteCfgFileOutput",
@@ -500,6 +512,7 @@ def interpretar_acs_event(datos: dict) -> tuple[list[dict[str, str]], bool]:
                 "tipo": texto or f"minor_0x{minor:x}" if isinstance(minor, int) else "desconocido",
                 "cuenta": str(e.get("netUser") or "") or None,
                 "ip": str(e.get("remoteHostAddr") or "") or None,
+                "serie": str(e["serialNo"]) if isinstance(e.get("serialNo"), int) else None,
             }
         )
     hay_mas = str(cuerpo.get("responseStatusStrg", "")).upper() == "MORE"
@@ -566,6 +579,7 @@ class AdaptadorHikvisionRegistro(_BaseRegistro):
                 e["cuenta"],
                 e["ip"],
                 *self._identidad_agente(objetivo, credencial),
+                serie=e.get("serie"),
             )
             if op is not None:
                 operaciones.append(op)

@@ -559,3 +559,28 @@ async def test_acs_event_prueba_variantes_y_recuerda_la_que_sirve():
             await adaptador.chequear(objetivo, CRED)
     assert len(vistos) == 3  # la segunda lectura va directo a la variante que sirvió
     assert all(c["major"] == 3 for c in vistos)
+
+
+async def test_acs_event_real_ds_k2602t():
+    """Respuesta real del panel de la oficina (IP reemplazada): dos sincronizaciones de hora
+    en el mismo segundo son dos entradas (serialNo distinto), y armar/desarmar de iVMS."""
+    cuerpo = (
+        FIXTURES_REGISTRO.parent
+        / "hikvision_registro"
+        / "ds-k2602t_v1.1.1"
+        / "AcsEvent_major3.json"
+    ).read_bytes()
+    with respx.mock() as mock:
+        mock.post(f"http://{PANEL_IP}/ISAPI/ContentMgmt/logSearch").respond(400)
+        mock.post(f"http://{PANEL_IP}/ISAPI/AccessControl/AcsEvent").respond(200, content=cuerpo)
+        _, (estado, *ops) = await _correr(
+            AdaptadorHikvisionRegistro, _objetivo("hikvision_registro", PANEL_IP)
+        )
+    assert estado.estado == Estado.OK
+    assert [o.codigo_fabricante for o in ops] == [
+        "remoteCheckTime", "remoteCheckTime", "remoteLogout", "remoteLogin", "remoteArm",
+        "remoteDisarm", "remoteLogout", "remoteLogin", "remoteDisarm",
+    ]  # fmt: skip
+    assert len({o.id for o in ops}) == len(ops)  # mismo segundo, ids distintos
+    assert ops[3].ocurrido_at == datetime(2026, 10, 27, 19, 16, 55, tzinfo=UTC)
+    assert (ops[5].cuenta, ops[5].ip_origen) == (None, None)  # desarme sin sesión (caída)
