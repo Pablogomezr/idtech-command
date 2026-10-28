@@ -161,12 +161,18 @@ def construir_operacion(
     cuenta: str | None,
     ip: str | None,
     cuenta_agente: str | None,
+    ip_agente: str | None = None,
 ) -> OperacionEquipo | None:
     if es_evento(texto_tipo):
         return None
     tipo = clasificar(texto_tipo)
-    if cuenta and cuenta_agente and cuenta == cuenta_agente and tipo not in CRITICAS:
-        return None  # las propias consultas del agente
+    if tipo not in CRITICAS:
+        # Las propias consultas del agente: por su cuenta propia o, si la cuenta es
+        # compartida (ver `_identidad_agente`), por la IP desde la que consulta.
+        if cuenta and cuenta_agente and cuenta == cuenta_agente:
+            return None
+        if ip_agente and _ip(ip) == ip_agente:
+            return None
     cuenta_txt, codigo = texto_seguro(cuenta), texto_seguro(texto_tipo)
     ip_txt = _ip(ip)
     clave = f"{dispositivo}|{ocurrido.isoformat()}|{codigo}|{cuenta_txt}|{ip_txt}"
@@ -221,6 +227,23 @@ class _BaseRegistro:
             self._cursor[objetivo.dispositivo_id] = (ultima, False)
         else:
             self._cursor[objetivo.dispositivo_id] = (fin, True)
+
+    @staticmethod
+    def _identidad_agente(
+        objetivo: Objetivo, credencial: Credencial
+    ) -> tuple[str | None, str | None]:
+        """(cuenta, ip) con que se reconocen las consultas del propio agente.
+
+        Hay equipos que solo admiten la cuenta `admin` (el DS-K2602T de la oficina, sin
+        forma de agregar usuarios). Con `cuenta_compartida: true` la cuenta deja de
+        servir para separar al agente de las personas: omitir "admin" ocultaría los accesos
+        humanos, que son justo lo que se audita. Entonces se separa por `ip_agente` (la IP
+        del mini PC vista por el equipo); sin ella se reporta todo, ruido antes que ceguera.
+        """
+        p = objetivo.parametros
+        if p.get("cuenta_compartida"):
+            return None, _ip(str(p.get("ip_agente", "")))
+        return credencial.usuario, None
 
     def _resultado(self, objetivo, estado, codigo=None, **metricas) -> ResultadoChequeo:
         return ResultadoChequeo(
@@ -378,7 +401,7 @@ class AdaptadorDahuaRegistro(_BaseRegistro):
                 texto or "desconocido",
                 item.get("User") or _campo(item, "user"),
                 ip_de_entrada(item),
-                credencial.usuario,
+                *self._identidad_agente(objetivo, credencial),
             )
             if op is not None:
                 operaciones.append(op)
@@ -487,7 +510,7 @@ class AdaptadorHikvisionRegistro(_BaseRegistro):
                 meta.rsplit("/", 1)[-1],
                 e.get("userName"),
                 e.get("ipAddress"),
-                credencial.usuario,
+                *self._identidad_agente(objetivo, credencial),
             )
             if op is not None:
                 operaciones.append(op)

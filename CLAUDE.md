@@ -30,7 +30,8 @@ dependencias, código aburrido y probado.
 7. **El agente nunca bloquea una cuenta de los equipos.** Usa su cuenta propia
    (`idcmd_monitor`), nunca `admin`; con `credencial_rechazada` pausa el objetivo 30 min y con
    `cuenta_bloqueada` espera lo que indica el equipo (planificador). Insistir con una clave
-   vieja dejaría a los operadores del cliente sin acceso.
+   vieja dejaría a los operadores del cliente sin acceso. Excepción: equipos que solo admiten
+   `admin` (DS-K2602T) usan `cuenta_compartida: true` + `ip_agente` (ADR 0009).
 
 ## Decisiones (ver `docs/adr/`)
 

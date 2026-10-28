@@ -35,6 +35,10 @@ pocos intentos fallidos (el NVR Dahua de la oficina se bloqueó ~25 min): con un
 propia, el bloqueo nunca afecta a los operadores. Al cambiar la clave en el equipo, actualizar
 la bóveda del agente el mismo día.
 
+Si el equipo no permite crear usuarios (p. ej. paneles Hikvision DS-K2602T: iVMS solo deja
+editar `admin`), se usa `admin` y el objetivo lleva `cuenta_compartida: true` e `ip_agente`
+con la IP del mini PC (ADR 0009, excepción). Anotarlo en el inventario del sitio.
+
 En los NVR, la cuenta del agente necesita permiso de **vista en vivo / monitoreo en TODOS los
 canales** contratados (los NVR Dahua dan permisos por canal). Sin él, el estado o la
 búsqueda de grabaciones de ese canal pueden fallar y parecer una cámara caída.

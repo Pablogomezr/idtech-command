@@ -31,6 +31,10 @@ objetivos:
     intervalo_s: 60
     parametros:
       lectoras_direcciones: "1,3"   # direcciones RS-485 de las lectoras instaladas
+      # El DS-K2602T solo admite la cuenta admin (no deja crear otras): se declara para que
+      # la auditoría no oculte los accesos humanos con admin (ADR 0009, excepción).
+      # cuenta_compartida: true
+      # ip_agente: "192.168.1.20"   # IP del mini PC vista por el panel
   # NVR Dahua: salud cada minuto y retención real cada 15 minutos.
   - dispositivo_id: "88888888-8888-4888-8888-888888888888"
     adaptador: dahua_nvr

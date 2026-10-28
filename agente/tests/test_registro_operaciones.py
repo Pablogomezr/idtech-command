@@ -434,3 +434,49 @@ def test_intentos_fallidos_seguidos_no_se_colapsan():
         for texto in ("Illegal Login", "Fallo al iniciar sesion.")
     ]
     assert len(unir_pares(ops)) == 5
+
+
+@pytest.mark.parametrize(
+    ("parametros", "esperado"),
+    [
+        # Cuenta propia del agente: sus inicios de sesión se omiten por la cuenta.
+        ({}, [("inicio_sesion", "admin", "192.168.1.9")]),
+        # Panel que solo admite admin: no se puede omitir por cuenta (ocultaría a las
+        # personas). Sin ip_agente se reporta todo...
+        (
+            {"cuenta_compartida": True},
+            [
+                ("inicio_sesion", "admin", "192.168.1.9"),
+                ("inicio_sesion", "admin", "192.168.1.20"),
+            ],
+        ),
+        # ...y con ip_agente se omite solo lo que viene del mini PC.
+        (
+            {"cuenta_compartida": True, "ip_agente": "192.168.1.20"},
+            [("inicio_sesion", "admin", "192.168.1.9")],
+        ),
+    ],
+)
+async def test_cuenta_compartida_admin(parametros, esperado):
+    texto = (
+        "found=2\r\n"
+        "items[0].Time=2026-10-27 13:00:00\r\nitems[0].Type=Login\r\n"
+        "items[0].User=admin\r\nitems[0].Detail.Address=192.168.1.9\r\n"
+        "items[1].Time=2026-10-27 13:05:00\r\nitems[1].Type=Login\r\n"
+        "items[1].User=admin\r\nitems[1].Detail.Address=192.168.1.20\r\n"
+    )
+    cred = Credencial(usuario="admin", clave=SecretStr("x"))
+    if not parametros:  # caso de referencia: el agente con su cuenta propia
+        texto = texto.replace("items[1].User=admin", "items[1].User=idcmd_monitor")
+        cred = CRED
+        esperado = [("inicio_sesion", "admin", "192.168.1.9")]
+    objetivo = _objetivo("dahua_registro", NVR_IP).model_copy(update={"parametros": parametros})
+    base = f"http://{NVR_IP}/cgi-bin/log.cgi"
+    with respx.mock() as mock:
+        mock.get(base, params={"action": "startFind"}).respond(200, text="token=5\r\n")
+        mock.get(base, params={"action": "doFind"}).respond(200, text=texto)
+        mock.get(base, params={"action": "stopFind"}).respond(200, text="OK\r\n")
+        async with httpx.AsyncClient() as cliente:
+            adaptador = AdaptadorDahuaRegistro(cliente_http=cliente, reloj=RelojFalso(AHORA))
+            _, *ops = await adaptador.chequear(objetivo, cred)
+    assert [(o.tipo, o.cuenta, o.ip_origen) for o in ops] == esperado

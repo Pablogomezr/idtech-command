@@ -35,3 +35,18 @@ ticket abierto · borrado de registros (siempre crítica) · intentos fallidos r
   tratamiento, con finalidad de seguridad, debe constar en la política de tratamiento de
   datos de IDtech y en el contrato con cada cliente.
 - Requiere crear la cuenta `idcmd_monitor` en cada equipo durante la instalación.
+
+## Excepción: equipos que solo admiten `admin` (2026-10-28)
+El DS-K2602T de la oficina (fw V1.1.1) no permite agregar usuarios: iVMS-4200 solo deja
+editar `admin`. Decisión de Pablo: usar `admin` en esos equipos, con estas reglas:
+- El objetivo declara `cuenta_compartida: true`. Ya no se omiten las consultas "por cuenta"
+  (se ocultarían los accesos humanos con admin); se omiten solo las que vienen de
+  `ip_agente`, la IP del mini PC vista por el equipo. Sin `ip_agente` se reporta todo.
+- La protección contra bloqueos del planificador (pausa de 30 min ante clave rechazada) es
+  más importante aquí: un bloqueo afectaría a la única cuenta del equipo. En Hikvision el
+  bloqueo por intentos fallidos se aplica a la IP de origen (pendiente de verificar en este
+  firmware), lo que limita el daño al propio agente.
+- La clave de `admin` vive en la bóveda del agente como cualquier otra; cuando el cliente
+  la cambie, debe actualizarse la bóveda el mismo día (runbook).
+- Se registra en el inventario del sitio qué equipos usan cuenta compartida, para
+  migrarlos a cuenta propia si un firmware posterior lo permite.
