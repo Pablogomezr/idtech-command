@@ -411,7 +411,14 @@ class AdaptadorDahuaRegistro(_BaseRegistro):
 
 # --- Hikvision ---------------------------------------------------------------------------
 
-OPS_HIKVISION = [Operacion("POST", r"/ISAPI/ContentMgmt/logSearch")]
+OPS_HIKVISION = [
+    Operacion("POST", r"/ISAPI/ContentMgmt/logSearch"),
+    # Registro de eventos de los controladores de acceso. OJO: la misma ruta devuelve las
+    # MARCACIONES (major 5, con nombre y tarjeta) si se las pide; la lista blanca no ve el
+    # cuerpo, así que el cuerpo se arma SOLO aquí, siempre con major 3 (operación), y la
+    # respuesta se vuelve a filtrar por major antes de usarla.
+    Operacion("POST", r"/ISAPI/AccessControl/AcsEvent", {"format": r"json"}),
+]
 _BUSQUEDA = """<?xml version="1.0" encoding="UTF-8"?>
 <CMSearchDescription>
 <searchID>{id}</searchID>
@@ -421,6 +428,36 @@ _BUSQUEDA = """<?xml version="1.0" encoding="UTF-8"?>
 <maxResults>50</maxResults>
 <searchResultPostion>{posicion}</searchResultPostion>
 </CMSearchDescription>"""
+
+MAJOR_OPERACION = 3
+# Subtipos de operación de Hikvision (HCNetSDK). Se traducen a un nombre en inglés que
+# `clasificar` entiende; un subtipo desconocido viaja como "minor_0x.." para descubrirlo.
+_MINOR_HIKVISION = {
+    0x41: "startDevice",
+    0x42: "stopDevice",
+    0x44: "reboot",
+    0x50: "localLogin",
+    0x51: "localLogout",
+    0x52: "localCfgParm",
+    0x5A: "localUpgrade",
+    0x70: "remoteLogin",
+    0x71: "remoteLogout",
+    0x76: "remoteGetParm",
+    0x77: "remoteCfgParm",
+    0x78: "remoteGetStatus",
+    0x7B: "remoteReboot",
+    0x7E: "remoteUpgrade",
+    0x86: "remoteCfgFileOutput",
+    0x87: "remoteCfgFileInput",
+    0x400: "remoteOpenDoor",
+    0x401: "remoteCloseDoor",
+    0x402: "remoteAlwaysOpen",
+    0x403: "remoteAlwaysClose",
+    0x404: "remoteCheckTime",
+    0x405: "ntpCheckTime",
+    0x406: "remoteCfgClearCard",
+    0x407: "remoteRestoreCfg",
+}
 
 
 def interpretar_registro_hikvision(texto: bytes) -> tuple[list[dict[str, str]], bool]:
@@ -438,8 +475,39 @@ def interpretar_registro_hikvision(texto: bytes) -> tuple[list[dict[str, str]], 
     return entradas, estado.upper() == "MORE"
 
 
+def interpretar_acs_event(datos: dict) -> tuple[list[dict[str, str]], bool]:
+    """(entradas de OPERACIÓN, hay_mas). De cada entrada se toman solo hora, subtipo, cuenta
+    e IP: nunca nombre, número de empleado ni tarjeta, aunque el panel los mande."""
+    cuerpo = datos.get("AcsEvent") or {}
+    entradas = []
+    for e in cuerpo.get("InfoList") or []:
+        if not isinstance(e, dict) or e.get("major") != MAJOR_OPERACION:
+            continue
+        minor = e.get("minor")
+        texto = _MINOR_HIKVISION.get(minor) if isinstance(minor, int) else None
+        entradas.append(
+            {
+                "hora": str(e.get("time", "")),
+                "tipo": texto or f"minor_0x{minor:x}" if isinstance(minor, int) else "desconocido",
+                "cuenta": str(e.get("netUser") or "") or None,
+                "ip": str(e.get("remoteHostAddr") or "") or None,
+            }
+        )
+    hay_mas = str(cuerpo.get("responseStatusStrg", "")).upper() == "MORE"
+    return entradas, hay_mas
+
+
+def _hora_pared(texto: str, zona: ZoneInfo) -> datetime:
+    """'2026-10-28T10:15:00-05:00' -> hora de pared en la zona del sitio. Se ignora el
+    desfase que escribe el equipo porque puede estar mal configurado (ver arriba)."""
+    return datetime.fromisoformat(texto.replace("Z", "")).replace(tzinfo=None).replace(tzinfo=zona)
+
+
 @registrar("hikvision_registro")
 class AdaptadorHikvisionRegistro(_BaseRegistro):
+    """Primero `ContentMgmt/logSearch` (DVR/NVR y algunos terminales). Si el equipo no lo
+    tiene (el DS-K2602T de la oficina responde 400), `AccessControl/AcsEvent` con major 3."""
+
     chequeo = "hikvision_registro"
 
     async def chequear(self, objetivo: Objetivo, credencial: Credencial | None):
@@ -455,64 +523,110 @@ class AdaptadorHikvisionRegistro(_BaseRegistro):
             verificar_tls=bool(p.get("verificar_tls", False)),
             capturar_en=self._capturar_en,
         )
-        formato = "%Y-%m-%dT%H:%M:%SZ"
-        entradas: list[dict[str, str]] = []
         try:
-            while len(entradas) < MAX_ENTRADAS:
-                cuerpo = _BUSQUEDA.format(
-                    id=uuid.uuid4(),
-                    posicion=len(entradas),
-                    inicio=inicio.astimezone(zona).strftime(formato),
-                    fin=fin.astimezone(zona).strftime(formato),
-                )
-                r = await cliente.solicitar(
-                    "POST",
-                    "/ISAPI/ContentMgmt/logSearch",
-                    content=cuerpo.encode(),
-                    headers={"Content-Type": "application/xml"},
-                )
-                if r.status_code != 200:
-                    if not entradas:
-                        return [
-                            self._resultado(objetivo, Estado.DESCONOCIDO, "registro_no_soportado")
-                        ]
-                    break
-                try:
-                    lote, hay_mas = interpretar_registro_hikvision(r.content)
-                except ET.ParseError:
-                    return [
-                        self._resultado(objetivo, Estado.DESCONOCIDO, "respuesta_no_reconocida")
-                    ]
-                entradas += lote
-                if not hay_mas or not lote:
-                    break
+            entradas = await self._log_search(cliente, inicio, fin, zona)
+            if entradas is None:
+                entradas = await self._acs_event(cliente, inicio, fin, zona)
+        except (ET.ParseError, ValueError):
+            return [self._resultado(objetivo, Estado.DESCONOCIDO, "respuesta_no_reconocida")]
         except httpx.TransportError:
             return [self._resultado(objetivo, Estado.DESCONOCIDO, "sin_respuesta_http")]
         finally:
             if self._cliente_http is None:
                 await cliente.cerrar()
+        if entradas is None:
+            return [self._resultado(objetivo, Estado.DESCONOCIDO, "registro_no_soportado")]
 
         operaciones, horas = [], []
         for e in entradas:
-            meta = e.get("metaId", "")
             try:
-                ocurrido = datetime.fromisoformat(e.get("StartDateTime", "").replace("Z", ""))
+                ocurrido = _hora_pared(e["hora"], zona)
             except ValueError:
                 continue
-            ocurrido = ocurrido.replace(tzinfo=None).replace(tzinfo=zona)
             horas.append(ocurrido)
-            # Solo operaciones. Eventos (p. ej. marcaciones con tarjeta) se descartan aquí.
-            if "/operation" not in meta.lower():
-                continue
+            if not e["operacion"]:
+                continue  # eventos (p. ej. marcaciones con tarjeta): nunca salen del agente
             op = construir_operacion(
                 objetivo.dispositivo_id,
                 ocurrido,
-                meta.rsplit("/", 1)[-1],
-                e.get("userName"),
-                e.get("ipAddress"),
+                e["tipo"],
+                e["cuenta"],
+                e["ip"],
                 *self._identidad_agente(objetivo, credencial),
             )
             if op is not None:
                 operaciones.append(op)
         self._avanzar(objetivo, inicio, fin, horas, len(entradas) >= MAX_ENTRADAS)
         return [self._resultado(objetivo, Estado.OK), *operaciones]
+
+    @staticmethod
+    async def _log_search(cliente, inicio, fin, zona) -> list[dict] | None:
+        formato = "%Y-%m-%dT%H:%M:%SZ"
+        crudas: list[dict[str, str]] = []
+        while len(crudas) < MAX_ENTRADAS:
+            cuerpo = _BUSQUEDA.format(
+                id=uuid.uuid4(),
+                posicion=len(crudas),
+                inicio=inicio.astimezone(zona).strftime(formato),
+                fin=fin.astimezone(zona).strftime(formato),
+            )
+            r = await cliente.solicitar(
+                "POST",
+                "/ISAPI/ContentMgmt/logSearch",
+                content=cuerpo.encode(),
+                headers={"Content-Type": "application/xml"},
+            )
+            if r.status_code != 200:
+                if not crudas:
+                    return None
+                break
+            lote, hay_mas = interpretar_registro_hikvision(r.content)
+            crudas += lote
+            if not hay_mas or not lote:
+                break
+        return [
+            {
+                "hora": e.get("StartDateTime", ""),
+                "operacion": "/operation" in e.get("metaId", "").lower(),
+                "tipo": e.get("metaId", "").rsplit("/", 1)[-1],
+                "cuenta": e.get("userName"),
+                "ip": e.get("ipAddress"),
+            }
+            for e in crudas
+        ]
+
+    @staticmethod
+    async def _acs_event(cliente, inicio, fin, zona) -> list[dict] | None:
+        formato = "%Y-%m-%dT%H:%M:%S%z"
+
+        def hora(momento: datetime) -> str:
+            t = momento.astimezone(zona).strftime(formato)
+            return f"{t[:-2]}:{t[-2:]}"  # -0500 -> -05:00
+
+        entradas: list[dict] = []
+        posicion, id_busqueda = 0, str(uuid.uuid4())
+        while len(entradas) < MAX_ENTRADAS:
+            cuerpo = {
+                "AcsEventCond": {
+                    "searchID": id_busqueda,
+                    "searchResultPosition": posicion,
+                    "maxResults": 30,
+                    "major": MAJOR_OPERACION,  # nunca 5 (marcaciones) ni 0 (todo)
+                    "minor": 0,
+                    "startTime": hora(inicio),
+                    "endTime": hora(fin),
+                }
+            }
+            r = await cliente.solicitar(
+                "POST", "/ISAPI/AccessControl/AcsEvent", params={"format": "json"}, json=cuerpo
+            )
+            if r.status_code != 200:
+                if posicion == 0:
+                    return None
+                break
+            lote, hay_mas = interpretar_acs_event(r.json())
+            entradas += [{**e, "operacion": True} for e in lote]
+            posicion += int((r.json().get("AcsEvent") or {}).get("numOfMatches") or 0)
+            if not hay_mas or not lote:
+                break
+        return entradas

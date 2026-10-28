@@ -1,5 +1,6 @@
 """Auditoría de accesos administrativos (ADR 0009, opción A: cuenta e IP de origen)."""
 
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -289,6 +290,7 @@ async def test_hikvision_solo_operaciones_nunca_marcaciones():
 async def test_hikvision_sin_logsearch():
     with respx.mock() as mock:
         mock.post(f"http://{PANEL_IP}/ISAPI/ContentMgmt/logSearch").respond(403)
+        mock.post(f"http://{PANEL_IP}/ISAPI/AccessControl/AcsEvent").respond(404)
         _, [r] = await _correr(
             AdaptadorHikvisionRegistro, _objetivo("hikvision_registro", PANEL_IP)
         )
@@ -480,3 +482,53 @@ async def test_cuenta_compartida_admin(parametros, esperado):
             adaptador = AdaptadorDahuaRegistro(cliente_http=cliente, reloj=RelojFalso(AHORA))
             _, *ops = await adaptador.chequear(objetivo, cred)
     assert [(o.tipo, o.cuenta, o.ip_origen) for o in ops] == esperado
+
+
+ACS_EVENT = {
+    "AcsEvent": {
+        "searchID": "x",
+        "responseStatusStrg": "OK",
+        "numOfMatches": 4,
+        "totalMatches": 4,
+        "InfoList": [
+            {"major": 3, "minor": 0x70, "time": "2026-10-28T09:58:01-05:00",
+             "netUser": "admin", "remoteHostAddr": "192.168.1.9"},
+            {"major": 3, "minor": 0x77, "time": "2026-10-28T10:01:12-05:00",
+             "netUser": "admin", "remoteHostAddr": "192.168.1.9"},
+            # Una marcación colada (el panel no debería mandarla con major 3): se descarta.
+            {"major": 5, "minor": 75, "time": "2026-10-28T08:01:00-05:00",
+             "name": "Juan Perez", "employeeNoString": "77", "cardNo": "1234567890"},
+            {"major": 3, "minor": 0x999, "time": "2026-10-28T10:05:00-05:00",
+             "netUser": "admin", "remoteHostAddr": "192.168.1.9"},
+        ],
+    }
+}  # fmt: skip
+
+
+async def test_hikvision_panel_sin_logsearch_usa_acs_event_solo_operaciones():
+    """DS-K2602T de la oficina: logSearch responde 400. Se lee AcsEvent con major 3 y
+    jamás se piden ni se devuelven marcaciones."""
+    with respx.mock() as mock:
+        mock.post(f"http://{PANEL_IP}/ISAPI/ContentMgmt/logSearch").respond(400)
+        acs = mock.post(
+            f"http://{PANEL_IP}/ISAPI/AccessControl/AcsEvent", params={"format": "json"}
+        ).respond(200, json=ACS_EVENT)
+        objetivo = _objetivo("hikvision_registro", PANEL_IP).model_copy(
+            update={"parametros": {"cuenta_compartida": True}}
+        )
+        async with httpx.AsyncClient() as cliente:
+            adaptador = AdaptadorHikvisionRegistro(cliente_http=cliente, reloj=RelojFalso(AHORA))
+            estado, *ops = await adaptador.chequear(
+                objetivo, Credencial(usuario="admin", clave=SecretStr("x"))
+            )
+    assert estado.estado == Estado.OK
+    assert [(o.tipo, o.cuenta, o.ip_origen, o.codigo_fabricante) for o in ops] == [
+        ("inicio_sesion", "admin", "192.168.1.9", "remoteLogin"),
+        ("cambio_configuracion", "admin", "192.168.1.9", "remoteCfgParm"),
+        ("otra", "admin", "192.168.1.9", "minor_0x999"),  # subtipo nuevo: visible para mapearlo
+    ]
+    assert ops[0].ocurrido_at == datetime(2026, 10, 28, 14, 58, 1, tzinfo=UTC)
+    pedido = json.loads(acs.calls[0].request.content)["AcsEventCond"]
+    assert pedido["major"] == 3  # nunca 5 (marcaciones)
+    texto = " ".join(o.model_dump_json() for o in ops)
+    assert "Juan" not in texto and "1234567890" not in texto

@@ -100,6 +100,11 @@ Pablo aprobó todos los supuestos ("ok"). Si alguno cambia, actualizar aquí y e
 - Validado (v16, 22:29Z): canales 1, 2 y 3 `ok` con 120,3 días; canal 5 (cámara movida al
   3) `canal_sin_camara` en salud y `sin_grabacion_reciente` en retención. NVR Dahua completo
   con `idcmd_monitor`: salud, cámaras, retención, grabación reciente y auditoría.
+- Panel DS-K2602T con `admin` (2026-10-28): no admite otros usuarios (iVMS solo edita
+  `admin`); se usa con `cuenta_compartida` (ADR 0009). Salud ok; se vieron en real los
+  cambios de Pablo (modos 7,3,3,3 -> 7,7,7,7; usuarios 1 -> 2) y el reloj atrasado 165 s
+  con NTP apagado. `ContentMgmt/logSearch` responde 400: se agregó `AccessControl/AcsEvent`
+  con major 3 (solo operaciones). Pendiente: validar AcsEvent y los subtipos reales.
 
 ## Pendientes de Pablo (ruta crítica, no son código)
 - Inventario de la oficina: modelo, firmware e IP de cada panel Hikvision y Dahua.
