@@ -54,7 +54,9 @@ def base_pruebas():
                 )
             )
         con.execute(
-            sql.SQL("GRANT idcmd_app, idcmd_ingesta TO {}").format(sql.Identifier(ROL_SERVICIO))
+            sql.SQL("GRANT idcmd_app, idcmd_ingesta, idcmd_worker TO {}").format(
+                sql.Identifier(ROL_SERVICIO)
+            )
         )
     yield {"dueno": dsn_dueno, "servicio": _dsn(nombre, ROL_SERVICIO, CLAVE_SERVICIO)}
     with psycopg.connect(DSN_ADMIN, autocommit=True) as con:

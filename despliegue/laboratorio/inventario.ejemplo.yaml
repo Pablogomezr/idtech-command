@@ -5,6 +5,12 @@ cliente: IDtech
 regional: Barranquilla
 sitio: Oficina IDtech
 ciudad: Barranquilla
+# Módulo de servicio (opcional): técnico de la zona (usuario del portal con rol tecnico) y
+# personas del cliente que reciben el enlace de seguimiento de cada ticket.
+tecnicos:
+  - {correo: tecnico@idtech.example, tipo: principal}
+contactos:
+  - {nombre: Jefe de seguridad, correo: seguridad@cliente.example}
 dispositivos:
   - clave: nvr
     nombre: NVR oficina

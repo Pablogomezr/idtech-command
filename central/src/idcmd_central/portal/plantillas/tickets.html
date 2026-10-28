@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block titulo %}Tickets · IDtech Command{% endblock %}
+{% block contenido %}
+<h1>Tickets de servicio</h1>
+<nav class="pestanas">
+  <a class="{% if ver == 'abiertos' %}activa{% endif %}" href="/portal/tickets">Abiertos</a>
+  <a class="{% if ver == 'cerrados' %}activa{% endif %}" href="/portal/tickets?ver=cerrados">Cerrados</a>
+</nav>
+<div class="sub">Se abren solos cuando el sistema confirma una falla y se asignan al técnico de la zona.</div>
+{% for t in tickets %}
+  {% set resp = plazo(t.vence_respuesta_at, t.aceptado_at, ahora) %}
+  {% set sol = plazo(t.vence_solucion_at, t.cerrado_at, ahora) %}
+  <a class="tarjeta fila-ticket p-{{ t.prioridad }}" href="/portal/tickets/{{ t.id }}">
+    <div class="equipo-cab">
+      <span class="nombre">#{{ t.numero }} · {{ t.equipo or 'Sitio completo' }}</span>
+      <span class="pastilla p-{{ t.prioridad }}">{{ PRIORIDADES[t.prioridad] }}</span>
+      <span class="pastilla e-ticket">{{ ESTADOS_TICKET[t.estado] }}</span>
+      {% if t.tipo == 'preventivo' %}<span class="pastilla e-sin_datos">Preventivo</span>{% endif %}
+    </div>
+    <div class="titular">{{ t.titulo }}</div>
+    <div class="vivo">{{ t.sitio }} · abierto {{ t.abierto_at|hora('%d/%m %H:%M') }} ({{ hace(t.abierto_at, ahora) }})
+      · técnico: {{ (t.tecnico or 'sin asignar').split(' ')[0] }}</div>
+    {% if ver == 'abiertos' %}
+    <div class="cifras">
+      <span class="n-{{ resp[1] }}">Respuesta: {{ resp[0] }}</span>
+      <span class="n-{{ sol[1] }}">Solución: {{ sol[0] }}</span>
+    </div>
+    {% else %}
+    <div class="vivo">{{ CIERRES.get(t.cierre, '') }} · cerrado {{ t.cerrado_at|hora('%d/%m %H:%M') }}</div>
+    {% endif %}
+  </a>
+{% else %}
+  <div class="tarjeta">{% if ver == 'abiertos' %}✓ No hay tickets abiertos.{% else %}Sin tickets cerrados.{% endif %}</div>
+{% endfor %}
+{% endblock %}

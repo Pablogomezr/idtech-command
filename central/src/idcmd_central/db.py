@@ -56,6 +56,11 @@ class BaseDatos:
         solo sirven las funciones de ingreso y sesión."""
         return self._transaccion("idcmd_app", "app.usuario_id", "")
 
+    def como_worker(self):
+        """Worker de servicio: ve todos los sitios, pero solo en las tablas de tickets y lo que
+        necesita para abrirlos (rol idcmd_worker, sin BYPASSRLS)."""
+        return self._transaccion("idcmd_worker", "app.usuario_id", "")
+
     def como_agente(self, agente_id: uuid.UUID):
         return self._transaccion("idcmd_ingesta", "app.agente_id", str(agente_id))
 

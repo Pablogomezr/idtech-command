@@ -146,3 +146,52 @@ def valor(v) -> str:
     if isinstance(v, float):
         return f"{v:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return str(v)
+
+
+ESTADOS_TICKET = {
+    "abierto": "Abierto",
+    "asignado": "Asignado",
+    "aceptado": "Aceptado",
+    "en_camino": "En camino",
+    "en_sitio": "En sitio",
+    "resuelto": "Resuelto (verificando)",
+    "cerrado": "Cerrado",
+    "cancelado": "Cancelado",
+}
+PRIORIDADES = {"critica": "Crítica", "alta": "Alta", "media": "Media", "baja": "Baja"}
+CIERRES = {
+    "verificado": "Reparado y verificado",
+    "recuperado_solo": "Se recuperó sin intervención",
+    "cancelado": "Cancelado",
+}
+# Botones del técnico según el estado del ticket: (acción, texto).
+ACCIONES_TICKET = {
+    "abierto": [("tomar", "Tomar este servicio")],
+    "asignado": [("aceptar", "Aceptar"), ("tomar", "Tomar este servicio")],
+    "aceptado": [("en_camino", "Voy en camino"), ("en_sitio", "Llegué al sitio"),
+                 ("resuelto", "Resuelto")],
+    "en_camino": [("en_sitio", "Llegué al sitio"), ("resuelto", "Resuelto")],
+    "en_sitio": [("resuelto", "Resuelto")],
+}  # fmt: skip
+
+
+def duracion(segundos: float) -> str:
+    s = int(abs(segundos))
+    if s < 3600:
+        return f"{max(s // 60, 1)} min"
+    if s < 86400:
+        h, m = divmod(s // 60, 60)
+        return f"{h} h {m} min" if m else f"{h} h"
+    d, h = divmod(s // 3600, 24)
+    return f"{d} d {h} h" if h else f"{d} d"
+
+
+def plazo(vence, cumplido, ahora) -> tuple[str, str]:
+    """(texto, nivel) de un compromiso SLA: cumplido a tiempo, vencido o cuánto falta."""
+    if cumplido is not None:
+        ok = cumplido <= vence
+        return ("Cumplido" if ok else "Cumplido fuera de plazo"), ("bien" if ok else "mal")
+    falta = (vence - ahora).total_seconds()
+    if falta < 0:
+        return f"Vencido hace {duracion(falta)}", "mal"
+    return f"Vence en {duracion(falta)}", "atencion" if falta < 3600 else "bien"

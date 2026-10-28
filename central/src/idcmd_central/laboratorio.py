@@ -28,6 +28,13 @@ inventario de la central). Los identificadores de los equipos son deterministas
         tipo_equipo: camara
         marca: dahua
 
+Opcional, para el módulo de servicio:
+
+    tecnicos:                 # usuarios del portal con rol tecnico (ya creados)
+      - {correo: tecnico@idtech.co, tipo: principal}
+    contactos:                # personas del cliente que siguen los tickets del sitio
+      - {nombre: Jefe de seguridad, correo: seguridad@cliente.co}
+
 El archivo NUNCA lleva claves: `credencial_ref` es el nombre con que la clave se guardó en
 la bóveda del agente (`idcmd credenciales guardar`).
 """
@@ -137,7 +144,53 @@ def cargar(dsn_dueno: str, datos: dict) -> Resultado:
                     "criticidad": d.get("criticidad", 2),
                 },
             )
+        avisos = _cargar_servicio(con, datos, cliente, sitio)
+    for aviso in avisos:
+        print(f"aviso: {aviso}")
     return Resultado(cliente, regional, sitio, ids)
+
+
+def _cargar_servicio(con, datos: dict, cliente, sitio) -> list[str]:
+    """Técnicos de la zona y contactos del cliente. Idempotente."""
+    avisos = []
+    for t in datos.get("tecnicos") or []:
+        tipo = t.get("tipo", "principal")
+        fila = con.execute(
+            "SELECT id, rol FROM idcmd.usuarios WHERE correo = %s", (t["correo"],)
+        ).fetchone()
+        if not fila or fila[1] != "tecnico":
+            avisos.append(
+                f"técnico {t['correo']} no existe o no tiene rol tecnico: créelo con"
+                " 'idcmd-central usuarios crear --rol tecnico' y repita"
+            )
+            continue
+        vigente = con.execute(
+            "SELECT tecnico_id FROM idcmd.asignaciones_tecnico WHERE sitio_id = %s AND tipo = %s"
+            " AND vigente_hasta IS NULL",
+            (sitio, tipo),
+        ).fetchone()
+        if vigente and vigente[0] == fila[0]:
+            continue
+        if vigente:
+            con.execute(
+                "UPDATE idcmd.asignaciones_tecnico SET vigente_hasta = now() WHERE sitio_id = %s"
+                " AND tipo = %s AND vigente_hasta IS NULL",
+                (sitio, tipo),
+            )
+        con.execute(
+            "INSERT INTO idcmd.asignaciones_tecnico (tecnico_id, cliente_id, sitio_id, tipo)"
+            " VALUES (%s, %s, %s, %s)",
+            (fila[0], cliente, sitio, tipo),
+        )
+    for c in datos.get("contactos") or []:
+        con.execute(
+            "INSERT INTO idcmd.contactos_sitio (cliente_id, sitio_id, nombre, correo,"
+            " telegram_chat_id) VALUES (%s, %s, %s, %s, %s)"
+            " ON CONFLICT (sitio_id, correo) DO UPDATE SET nombre = excluded.nombre,"
+            " telegram_chat_id = excluded.telegram_chat_id, activo = true",
+            (cliente, sitio, c["nombre"], c.get("correo"), c.get("telegram_chat_id")),
+        )
+    return avisos
 
 
 def config_agente(

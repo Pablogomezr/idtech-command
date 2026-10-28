@@ -34,3 +34,18 @@ un segundo factor nuevo y cierra las sesiones abiertas (`idcmd-central usuarios 
   los equipos se identifican por sitio + clave).
 - Detener: `docker compose --env-file C:\idtech-lab\lab.env -f despliegue\laboratorio\docker-compose.yml down`
   (agregar `-v` borra la base y el buzón del agente).
+
+## Módulo de servicio (tickets)
+El servicio `worker` abre un ticket cuando el agente confirma una falla, lo asigna al técnico
+principal del sitio y avisa. Sin técnico asignado, el ticket queda "Abierto" y se avisa a los
+administradores, que pueden "Tomar este servicio".
+
+- Crear un técnico: `docker compose ... run --rm -it preparar idcmd-central usuarios crear
+  --correo tecnico@... --nombre "..." --rol tecnico`, y en `inventario.yaml`:
+  `tecnicos: [{correo: tecnico@..., tipo: principal}]`; volver a correr el script.
+- Contactos del cliente (reciben el enlace de seguimiento): `contactos: [{nombre: ..., correo: ...}]`.
+- Correo: agregar a `lab.env` `IDCMD_SMTP_SERVIDOR=smtp.gmail.com`, `IDCMD_SMTP_USUARIO=...`,
+  `IDCMD_SMTP_CLAVE=<contraseña de aplicación de Google, no la del correo>`.
+- Telegram: crear un bot con @BotFather, poner `IDCMD_TELEGRAM_TOKEN=...` en `lab.env`, y vincular
+  cada usuario: `idcmd-central usuarios telegram --correo ... --chat-id <id>` (el id lo da @userinfobot).
+- Sin correo ni Telegram configurados, los avisos se ven en el portal, menú "Avisos".

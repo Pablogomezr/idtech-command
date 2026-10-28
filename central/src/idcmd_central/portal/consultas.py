@@ -198,3 +198,83 @@ async def auditar(
         " VALUES (%s, %s, %s, %s, %s)",
         (usuario_id, accion, recurso, ip, Jsonb(detalle or {})),
     )
+
+
+# --- Tickets ---------------------------------------------------------------------------------
+
+
+async def tickets(con: AsyncConnection, abiertos: bool = True, limite: int = 200) -> list[dict]:
+    cur = await con.cursor(row_factory=dict_row).execute(
+        f"""
+        SELECT t.id, t.numero, t.prioridad::text AS prioridad, t.estado::text AS estado,
+               t.titulo, t.tipo, t.abierto_at, t.aceptado_at, t.cerrado_at, t.cierre,
+               t.vence_respuesta_at, t.vence_solucion_at,
+               s.nombre AS sitio, d.nombre AS equipo, u.nombre AS tecnico
+          FROM idcmd.tickets t
+          JOIN idcmd.sitios s ON s.id = t.sitio_id
+          LEFT JOIN idcmd.dispositivos d ON d.id = t.dispositivo_id
+          LEFT JOIN idcmd.usuarios u ON u.id = t.tecnico_id
+         WHERE t.estado {"NOT IN" if abiertos else "IN"} ('cerrado', 'cancelado')
+         ORDER BY {
+            "array_position(ARRAY['critica','alta','media','baja'], t.prioridad::text),"
+            if abiertos
+            else ""
+        } t.abierto_at DESC
+         LIMIT %s
+        """,  # noqa: S608 - solo se alternan fragmentos fijos, nunca datos
+        (limite,),
+    )
+    return await cur.fetchall()
+
+
+async def ticket(con: AsyncConnection, ticket_id: uuid.UUID) -> dict | None:
+    cur = await con.cursor(row_factory=dict_row).execute(
+        """
+        SELECT t.*, t.prioridad::text AS prioridad, t.estado::text AS estado,
+               s.nombre AS sitio, d.nombre AS equipo, u.nombre AS tecnico
+          FROM idcmd.tickets t
+          JOIN idcmd.sitios s ON s.id = t.sitio_id
+          LEFT JOIN idcmd.dispositivos d ON d.id = t.dispositivo_id
+          LEFT JOIN idcmd.usuarios u ON u.id = t.tecnico_id
+         WHERE t.id = %s
+        """,
+        (ticket_id,),
+    )
+    return await cur.fetchone()
+
+
+async def eventos_ticket(con: AsyncConnection, ticket_id: uuid.UUID) -> list[dict]:
+    cur = await con.cursor(row_factory=dict_row).execute(
+        """
+        SELECT e.at, e.tipo, e.texto, e.visible_cliente, u.nombre AS usuario
+          FROM idcmd.eventos_ticket e LEFT JOIN idcmd.usuarios u ON u.id = e.usuario_id
+         WHERE e.ticket_id = %s ORDER BY e.id
+        """,
+        (ticket_id,),
+    )
+    return await cur.fetchall()
+
+
+async def tickets_abiertos_por_equipo(con: AsyncConnection, sitio_id: uuid.UUID) -> dict:
+    cur = await con.execute(
+        "SELECT dispositivo_id, id, numero, estado::text FROM idcmd.tickets"
+        " WHERE sitio_id = %s AND estado NOT IN ('cerrado', 'cancelado')",
+        (sitio_id,),
+    )
+    return {d: {"id": i, "numero": n, "estado": e} for d, i, n, e in await cur.fetchall()}
+
+
+async def contar_abiertos(con: AsyncConnection) -> int:
+    cur = await con.execute(
+        "SELECT count(*) FROM idcmd.tickets WHERE estado NOT IN ('cerrado', 'cancelado')"
+    )
+    return (await cur.fetchone())[0]
+
+
+async def avisos_enviados(con: AsyncConnection, limite: int = 200) -> list[dict]:
+    cur = await con.cursor(row_factory=dict_row).execute(
+        "SELECT n.creada_at, n.canal, n.destino, n.asunto, n.cuerpo, n.resultado, n.enviada_at"
+        " FROM idcmd.notificaciones n ORDER BY n.id DESC LIMIT %s",
+        (limite,),
+    )
+    return await cur.fetchall()

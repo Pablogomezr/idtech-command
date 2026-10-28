@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Servicio #{{ t.numero }} · IDtech</title>
+  <link rel="stylesheet" href="/portal/estaticos/portal.css">
+</head>
+<body>
+<header class="barra"><span class="marca">IDtech · Seguimiento de servicio</span></header>
+<main>
+  <h1>Servicio #{{ t.numero }}</h1>
+  <div class="sub">{{ t.sitio }}{% if t.equipo %} · {{ t.equipo }}{% endif %}</div>
+  {% set cerrado = t.estado in ['cerrado', 'cancelado'] %}
+  <div class="resumen {% if cerrado %}resumen-bien{% else %}resumen-atencion{% endif %}">
+    <b>{{ ESTADOS_TICKET[t.estado] }}</b> — {{ t.titulo }}
+    <div class="vivo">Prioridad {{ PRIORIDADES[t.prioridad] }}{% if t.tecnico %} · técnico: {{ t.tecnico }}{% endif %}</div>
+  </div>
+  <ol class="pasos">
+    {% set orden = ['abierto', 'asignado', 'aceptado', 'en_camino', 'en_sitio', 'resuelto', 'cerrado'] %}
+    {% set actual = orden.index(t.estado) if t.estado in orden else 0 %}
+    {% for e, texto in [('abierto', 'Falla detectada'), ('asignado', 'Técnico asignado'), ('aceptado', 'Aceptado'), ('en_camino', 'En camino'), ('en_sitio', 'En sitio'), ('resuelto', 'Reparado'), ('cerrado', 'Verificado y cerrado')] %}
+    <li class="{% if loop.index0 < actual %}hecho{% elif loop.index0 == actual %}actual{% endif %}">{{ texto }}</li>
+    {% endfor %}
+  </ol>
+  <div class="tarjeta">
+    <dl class="metricas">
+      <dt>Falla desde</dt><dd>{{ t.abierto_at|hora('%d/%m/%Y %H:%M') }}</dd>
+      <dt>Atención comprometida</dt><dd>{{ t.vence_respuesta_at|hora('%d/%m %H:%M') }}{% if t.aceptado_at %} · atendido {{ t.aceptado_at|hora('%d/%m %H:%M') }}{% endif %}</dd>
+      <dt>Solución comprometida</dt><dd>{{ t.vence_solucion_at|hora('%d/%m %H:%M') }}{% if t.cerrado_at %} · cerrado {{ t.cerrado_at|hora('%d/%m %H:%M') }}{% endif %}</dd>
+    </dl>
+  </div>
+  <h2>Historial</h2>
+  <ol class="linea-tiempo">
+    {% for e in t.eventos %}
+    <li><span class="vivo">{{ e.at|hora_iso }}</span> {{ e.texto }}</li>
+    {% endfor %}
+  </ol>
+  <p class="vivo nota">Este enlace es personal: no lo reenvíe. Ingeniería y Desarrollo IDtech SAS.</p>
+</main>
+</body>
+</html>

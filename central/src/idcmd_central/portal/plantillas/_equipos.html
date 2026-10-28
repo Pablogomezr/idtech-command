@@ -39,6 +39,8 @@
     <div class="equipo-cab">
       <span class="nombre">{{ eq.nombre }}</span>
       <span class="pastilla e-{{ eq.estado }}">{{ ESTADOS[eq.estado] }}</span>
+      {% set tk = (tickets or {}).get(eq.id) %}
+      {% if tk %}<a class="pastilla ticket" href="/portal/tickets/{{ tk.id }}">Ticket #{{ tk.numero }} · {{ ESTADOS_TICKET[tk.estado] }}</a>{% endif %}
       <span class="modelo">{{ TIPOS_EQUIPO.get(eq.tipo_equipo, eq.tipo_equipo|legible) }}{% if eq.marca %} · {{ eq.marca|capitalize }}{% endif %}{% if eq.modelo %} {{ eq.modelo }}{% endif %}{% if eq.ubicacion %} · {{ eq.ubicacion }}{% endif %}</span>
     </div>
     {% for c in eq.chequeos %}

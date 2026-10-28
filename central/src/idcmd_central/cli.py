@@ -6,6 +6,8 @@ idcmd-central agentes revocar <agente_id>
 idcmd-central llave-totp                       # llave para cifrar los segundos factores
 idcmd-central usuarios crear --correo a@b.co --nombre "Pablo" --rol admin
 idcmd-central laboratorio preparar --inventario oficina.yaml --salida /lab
+idcmd-central usuarios telegram --correo a@b.co --chat-id 123456789
+idcmd-central worker                          # tickets, escalamiento, SLA y avisos
 """
 
 from __future__ import annotations
@@ -77,6 +79,41 @@ def cmd_agentes_revocar(args) -> int:
         ).rowcount
     print("agente revocado" if n else "no existe o ya estaba revocado")
     return 0 if n else 1
+
+
+def cmd_worker(args) -> int:
+    import asyncio
+    import logging
+
+    from .db import BaseDatos
+    from .servicio.worker import ejecutar
+
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
+
+    async def principal():
+        bd = BaseDatos(os.environ["IDCMD_DSN"], max_size=4)
+        await bd.abrir()
+        try:
+            await ejecutar(bd)
+        finally:
+            await bd.cerrar()
+
+    asyncio.run(principal())
+    return 0
+
+
+def cmd_usuarios_telegram(args) -> int:
+    with psycopg.connect(_dsn_admin()) as con:
+        n = con.execute(
+            "UPDATE idcmd.usuarios SET telegram_chat_id = %s WHERE correo = %s",
+            (args.chat_id, args.correo),
+        ).rowcount
+    if not n:
+        sys.exit(f"no existe el usuario {args.correo}")
+    print(f"Telegram vinculado a {args.correo}")
+    return 0
 
 
 def cmd_llave_totp(args) -> int:
@@ -184,7 +221,7 @@ def cmd_laboratorio_preparar(args) -> int:
                     sql.Literal(clave_servicio)
                 )
             )
-            con.execute("GRANT idcmd_app, idcmd_ingesta TO idcmd_servicio")
+            con.execute("GRANT idcmd_app, idcmd_ingesta, idcmd_worker TO idcmd_servicio")
         print("rol de servicio idcmd_servicio: listo")
 
     datos = laboratorio.leer(args.inventario)
@@ -235,6 +272,13 @@ def main(argv: list[str] | None = None) -> int:
     u_mfa.add_argument("--correo", required=True)
     u_mfa.add_argument("--nueva-clave", action="store_true", help="cambiar también la clave")
     u_mfa.set_defaults(fn=cmd_usuarios_restablecer_mfa)
+    u_tg = usuarios.add_parser("telegram", help="vincular el chat de Telegram de un usuario")
+    u_tg.add_argument("--correo", required=True)
+    u_tg.add_argument("--chat-id", type=int, required=True)
+    u_tg.set_defaults(fn=cmd_usuarios_telegram)
+    sub.add_parser("worker", help="servicio: tickets, escalamiento, SLA y avisos").set_defaults(
+        fn=cmd_worker
+    )
     lab = sub.add_parser("laboratorio").add_subparsers(dest="accion", required=True)
     preparar = lab.add_parser("preparar")
     preparar.add_argument("--inventario", type=Path, required=True)

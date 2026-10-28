@@ -49,10 +49,30 @@ services:
       IDCMD_DSN: postgresql://idcmd_servicio:${IDCMD_CLAVE_SERVICIO}@bd:5432/postgres
       IDCMD_LLAVE_TOTP: ${IDCMD_LLAVE_TOTP}
       IDCMD_COOKIE_SEGURA: "false"   # solo laboratorio: http://localhost
+      IDCMD_URL_PUBLICA: ${IDCMD_URL_PUBLICA:-http://localhost:8000}
     ports: ["127.0.0.1:8000:8000"]   # solo desde este PC
     sysctls:
       # El agente comparte esta red: ping sin privilegios para el adaptador icmp.
       net.ipv4.ping_group_range: "0 2147483647"
+    depends_on: {bd: {condition: service_healthy}}
+
+  # Servicio: abre tickets de las fallas confirmadas, asigna al técnico de la zona, escala,
+  # verifica antes de cerrar, vigila el SLA y envía los avisos.
+  worker:
+    <<: *endurecido
+    image: idcmd-central:lab
+    command: ["idcmd-central", "worker"]
+    environment:
+      IDCMD_DSN: postgresql://idcmd_servicio:${IDCMD_CLAVE_SERVICIO}@bd:5432/postgres
+      IDCMD_LLAVE_TOTP: ${IDCMD_LLAVE_TOTP}
+      IDCMD_URL_PUBLICA: ${IDCMD_URL_PUBLICA:-http://localhost:8000}
+      # Opcionales: sin ellos los avisos quedan en el portal (Avisos) como "sin canal".
+      IDCMD_SMTP_SERVIDOR: ${IDCMD_SMTP_SERVIDOR:-}
+      IDCMD_SMTP_PUERTO: ${IDCMD_SMTP_PUERTO:-587}
+      IDCMD_SMTP_USUARIO: ${IDCMD_SMTP_USUARIO:-}
+      IDCMD_SMTP_CLAVE: ${IDCMD_SMTP_CLAVE:-}
+      IDCMD_SMTP_REMITENTE: ${IDCMD_SMTP_REMITENTE:-}
+      IDCMD_TELEGRAM_TOKEN: ${IDCMD_TELEGRAM_TOKEN:-}
     depends_on: {bd: {condition: service_healthy}}
 
   agente:

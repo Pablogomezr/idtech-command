@@ -46,6 +46,7 @@ dependencias, código aburrido y probado.
 | 0007 | Idioma: identificadores y documentación en español, sin tildes ni ñ en el código. |
 | 0008 | Totales de usuarios y configuración de seguridad permitidos; datos de personas no. |
 | 0009 | Auditoría de accesos administrativos (cuenta e IP); solo operaciones, nunca marcaciones. |
+| 0010 | Servicio: la falla abre el ticket sola, asignación por zona con escalamiento, SLA 24/7, cierre verificado, avisos correo/Telegram, seguimiento por enlace firmado. |
 
 Supuestos aprobados por Pablo (P1–P10): `docs/supuestos.md`.
 
@@ -65,6 +66,7 @@ central/     FastAPI: ingesta + portal + worker (idcmd_central)
   src/idcmd_central/contrato.py  espejo del contrato; una prueba lo compara con el esquema
   src/idcmd_central/portal/      ingreso (clave + TOTP), estado en vivo (HTMX), auditoría
   src/idcmd_central/laboratorio.py  inventario YAML -> central + config del agente
+  src/idcmd_central/servicio/    worker de tickets (reglas, apertura, escalamiento, SLA, avisos)
 docs/        adr/, runbooks/, plantillas/, supuestos.md
 despliegue/  laboratorio/ (compose + iniciar.ps1 para un PC), minipc/ (nftables)
 ```
@@ -85,6 +87,7 @@ uv sync && uv run pytest -q
 IDCMD_DSN_ADMIN=... uv run idcmd-central migrar
 IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "..."
 IDCMD_DSN_ADMIN=... IDCMD_LLAVE_TOTP=... uv run idcmd-central usuarios crear --correo ... --rol admin
+IDCMD_DSN=... IDCMD_LLAVE_TOTP=... uv run idcmd-central worker      # tickets, SLA y avisos
 docker build -f central/Dockerfile -t idcmd-central .   # desde la raíz del repositorio
 ```
 Laboratorio completo en un PC: `docs/runbooks/laboratorio.md`.
@@ -104,6 +107,9 @@ Laboratorio completo en un PC: `docs/runbooks/laboratorio.md`.
   correctos. Sesiones: la cookie lleva un token; la base guarda su SHA-256 (`idcmd.sesiones`,
   solo por funciones).
 - `auditoria_accesos` solo admite INSERT.
+- Tickets: el portal solo los lee; toda acción pasa por `idcmd.accion_ticket` (valida quién y qué
+  transición). `eventos_ticket` solo se agrega; `visible_cliente = false` para notas y eventos
+  internos. El worker usa `idcmd_worker` (políticas explícitas, sin BYPASSRLS).
 - Migraciones: nunca editar una ya aplicada en producción; crear la siguiente.
 - `agregados_hora` sin particionar (volumen manejable); se conservan 90 días.
 
@@ -177,4 +183,5 @@ Dahua: **nunca** usar `configManager.cgi` (RemoteDevice devuelve las claves de l
 | E1 | Central: esquema Postgres + RLS, API de ingesta | ✅ Entrega 3 |
 | E2 | Adaptadores Hikvision acceso, Dahua acceso/cámara/NVR/retención + `idcmd sondear` | ✅ Entrega 3b (validar en oficina) |
 | E1 | Portal mínimo con login MFA y estado en vivo + modo laboratorio | ✅ Entrega 4 (probado de punta a punta en contenedores; falta en la oficina) |
-| E2–E6 | Adaptadores, operación, PWA, piloto, SLA e informe | Pendiente |
+| E3 | Servicio parte 1: tickets automáticos, asignación/escalamiento, SLA, avisos, seguimiento | ✅ Entrega 5 (probado de punta a punta en contenedores) |
+| E3–E6 | Servicio partes 2–3 (PWA técnico, acta PDF), informe SLA mensual, piloto | Pendiente |

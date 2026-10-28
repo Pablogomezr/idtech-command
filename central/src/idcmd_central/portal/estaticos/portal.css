@@ -107,3 +107,37 @@ ul.puntos .n-info { color: var(--suave); }
 details.tecnicos { margin-top: 6px; font-size: 13px; }
 details.tecnicos summary { color: var(--suave); cursor: pointer; }
 .nota { margin-top: 16px; }
+
+/* Servicio: tickets, línea de tiempo y seguimiento. */
+nav.principal { display: flex; gap: 14px; font-size: 14px; }
+.fila-ticket { display: block; color: inherit; text-decoration: none; }
+.fila-ticket:hover { text-decoration: none; border-color: var(--marca); }
+.p-critica { color: #fff; background: var(--caido); }
+.p-alta { color: var(--caido); background: var(--caido-f); }
+.p-media { color: var(--deg); background: var(--deg-f); }
+.p-baja { color: var(--nd); background: var(--nd-f); }
+.tarjeta.p-critica, .tarjeta.p-alta, .tarjeta.p-media, .tarjeta.p-baja { color: inherit; background: var(--tarjeta); }
+.tarjeta.p-critica { border-left: 4px solid var(--caido); }
+.tarjeta.p-alta { border-left: 4px solid var(--caido); }
+.tarjeta.p-media { border-left: 4px solid var(--deg); }
+.tarjeta.p-baja { border-left: 4px solid var(--nd); }
+.e-ticket { color: var(--marca); background: var(--nd-f); }
+a.pastilla.ticket { color: var(--marca); background: var(--nd-f); text-decoration: none; }
+.n-bien { color: var(--ok); }
+.n-atencion { color: var(--deg); }
+.n-mal { color: var(--caido); font-weight: 600; }
+.botones { display: flex; gap: 8px; flex-wrap: wrap; }
+.botones form { margin: 0; }
+ol.linea-tiempo { list-style: none; padding: 0; margin: 0 0 12px; border-left: 2px solid var(--borde); }
+ol.linea-tiempo li { padding: 6px 0 6px 14px; position: relative; font-size: 14px; }
+ol.linea-tiempo li::before { content: ""; position: absolute; left: -6px; top: 12px; width: 10px; height: 10px;
+  border-radius: 50%; background: var(--marca); }
+ol.linea-tiempo li.interno::before { background: var(--nd); }
+textarea { width: 100%; padding: 8px; font: inherit; border: 1px solid var(--borde); border-radius: 8px;
+  background: var(--fondo); color: var(--texto); margin: 4px 0 8px; }
+pre.mensaje { white-space: pre-wrap; font: 13px/1.4 ui-monospace, monospace; background: var(--fondo);
+  padding: 8px; border-radius: 8px; }
+ol.pasos { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+ol.pasos li { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--nd-f); color: var(--nd); }
+ol.pasos li.hecho { background: var(--ok-f); color: var(--ok); }
+ol.pasos li.actual { background: var(--marca); color: #fff; font-weight: 600; }

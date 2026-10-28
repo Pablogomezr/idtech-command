@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titulo %}Avisos · IDtech Command{% endblock %}
+{% block contenido %}
+<h1>Avisos enviados</h1>
+<div class="sub">Correos y mensajes de Telegram de los tickets. "Sin canal" = el correo o Telegram aún no
+están configurados en el servidor: así se ve lo que se habría enviado.</div>
+{% for a in avisos %}
+<div class="tarjeta">
+  <div class="equipo-cab">
+    <span class="nombre">{{ a.asunto }}</span>
+    <span class="pastilla {% if a.resultado == 'enviada' %}e-ok{% elif a.resultado == 'sin_canal' %}e-sin_datos{% elif a.resultado %}e-caido{% else %}e-degradado{% endif %}">
+      {{ {'enviada': 'Enviado', 'sin_canal': 'Sin canal'}.get(a.resultado, a.resultado or 'Pendiente') }}</span>
+  </div>
+  <div class="vivo">{{ a.creada_at|hora('%d/%m %H:%M') }} · {{ a.canal|capitalize }} → {{ a.destino }}</div>
+  <details class="tecnicos"><summary>Ver mensaje</summary><pre class="mensaje">{{ a.cuerpo }}</pre></details>
+</div>
+{% else %}
+<div class="tarjeta">Aún no hay avisos.</div>
+{% endfor %}
+{% endblock %}

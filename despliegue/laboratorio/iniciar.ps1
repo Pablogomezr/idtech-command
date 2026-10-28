@@ -74,8 +74,8 @@ if ($RestablecerMfa) {
   Write-Host "`n== 3. Usuario del portal: ya existe ==" -ForegroundColor Cyan
 }
 
-Write-Host "`n== 4. Central y agente ==" -ForegroundColor Cyan
-docker @C up -d central agente
+Write-Host "`n== 4. Central, servicio (tickets) y agente ==" -ForegroundColor Cyan
+docker @C up -d central worker agente
 Start-Sleep -Seconds 5
 docker @C ps
 Start-Process "http://localhost:8000"

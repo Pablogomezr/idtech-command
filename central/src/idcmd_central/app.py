@@ -64,7 +64,8 @@ def crear_app(bd: BaseDatos | None = None) -> FastAPI:
     @app.middleware("http")
     async def cabeceras_seguridad(request: Request, llamar):
         respuesta = await llamar(request)
-        if request.url.path == "/" or request.url.path.startswith("/portal"):
+        ruta = request.url.path
+        if ruta == "/" or ruta.startswith(("/portal", "/seguimiento")):
             for nombre, valor in CABECERAS_PORTAL.items():
                 if nombre == "Cache-Control" and "/estaticos/" in request.url.path:
                     continue

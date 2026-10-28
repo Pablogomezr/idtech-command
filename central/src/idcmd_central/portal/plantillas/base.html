@@ -11,6 +11,11 @@
 {% if usuario %}
 <header class="barra">
   <a class="marca" href="/portal">IDtech Command</a>
+  <nav class="principal">
+    <a href="/portal">Sitios</a>
+    <a href="/portal/tickets">Tickets</a>
+    {% if usuario.rol == 'admin' %}<a href="/portal/avisos">Avisos</a>{% endif %}
+  </nav>
   <span class="usuario">{{ usuario.nombre }} · {{ usuario.rol }}</span>
   <form method="post" action="/portal/salir"><button class="discreto" type="submit">Salir</button></form>
 </header>
