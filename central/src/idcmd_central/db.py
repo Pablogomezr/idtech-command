@@ -51,6 +51,11 @@ class BaseDatos:
     def como_usuario(self, usuario_id: uuid.UUID):
         return self._transaccion("idcmd_app", "app.usuario_id", str(usuario_id))
 
+    def como_anonimo(self):
+        """Portal sin sesión (ingreso): rol idcmd_app sin usuario; la RLS no muestra nada y
+        solo sirven las funciones de ingreso y sesión."""
+        return self._transaccion("idcmd_app", "app.usuario_id", "")
+
     def como_agente(self, agente_id: uuid.UUID):
         return self._transaccion("idcmd_ingesta", "app.agente_id", str(agente_id))
 

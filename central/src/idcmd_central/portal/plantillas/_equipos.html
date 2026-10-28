@@ -1,0 +1,41 @@
+<div id="equipos" hx-get="/portal/sitios/{{ sitio.id }}/equipos" hx-trigger="every {{ REFRESCO_S }}s"
+     hx-swap="outerHTML">
+  {% set minutos = ((ahora - sitio.ultimo_latido).total_seconds() / 60) if sitio.ultimo_latido else none %}
+  <div class="vivo">
+    En vivo · actualizado {{ ahora|hora('%H:%M:%S') }} ·
+    <span class="{% if minutos is none or minutos > 5 %}alerta-agente{% endif %}">
+      último contacto del agente {{ hace(sitio.ultimo_latido, ahora) }}
+      {% if minutos is not none and minutos > 5 %}(sin conexión: los estados pueden estar desactualizados){% endif %}
+    </span>
+  </div>
+  {% for eq in equipos %}
+  <div class="tarjeta borde-{{ eq.estado }}">
+    <div class="equipo-cab">
+      <span class="nombre">{{ eq.nombre }}</span>
+      <span class="pastilla e-{{ eq.estado }}">{{ ESTADOS[eq.estado] }}</span>
+      <span class="modelo">{{ TIPOS_EQUIPO.get(eq.tipo_equipo, eq.tipo_equipo|legible) }}{% if eq.marca %} · {{ eq.marca|capitalize }}{% endif %}{% if eq.modelo %} {{ eq.modelo }}{% endif %}{% if eq.ubicacion %} · {{ eq.ubicacion }}{% endif %}</span>
+    </div>
+    {% for c in eq.chequeos %}
+    <div class="chequeo">
+      <div class="titulo">
+        <span>{{ CHEQUEOS.get(c.chequeo, c.chequeo|legible) }}</span>
+        {% if c.estado %}<span class="pastilla e-{{ c.estado }}">{{ ESTADOS[c.estado] }}</span>{% endif %}
+        {% if c.codigo %}<span class="codigo">{{ c.codigo|codigo }}</span>{% endif %}
+        {% if c.desde and c.estado != 'ok' %}<span class="vivo">desde {{ c.desde|hora }}</span>{% endif %}
+      </div>
+      {% if c.metricas %}
+      <dl class="metricas">
+        {% for k, v in c.metricas.items() %}
+        <dt>{{ METRICAS.get(k, k|legible) }}</dt><dd>{{ v|valor }}</dd>
+        {% endfor %}
+      </dl>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="vivo">Sin datos todavía del agente.</div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="tarjeta">Este sitio no tiene equipos en el inventario.</div>
+  {% endfor %}
+</div>

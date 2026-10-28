@@ -6,11 +6,15 @@ el rol dueño del esquema, nunca con los roles de la aplicación.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import psycopg
 
-DIRECTORIO = Path(__file__).resolve().parents[2] / "migraciones"
+# En el repositorio: central/migraciones. En la imagen Docker se indica con IDCMD_MIGRACIONES.
+DIRECTORIO = Path(
+    os.environ.get("IDCMD_MIGRACIONES", Path(__file__).resolve().parents[2] / "migraciones")
+)
 
 
 def pendientes(con: psycopg.Connection, directorio: Path = DIRECTORIO) -> list[Path]:

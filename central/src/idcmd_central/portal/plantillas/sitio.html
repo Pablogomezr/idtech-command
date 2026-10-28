@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block titulo %}{{ sitio.nombre }} · IDtech Command{% endblock %}
+{% block contenido %}
+<div class="sub"><a href="/portal">Sitios</a> › {{ sitio.cliente }} › {{ sitio.regional }}</div>
+<h1>{{ sitio.nombre }}</h1>
+<nav class="pestanas">
+  <a class="activa" href="/portal/sitios/{{ sitio.id }}">Estado</a>
+  <a href="/portal/sitios/{{ sitio.id }}/auditoria">Auditoría</a>
+</nav>
+{% include "_equipos.html" %}
+{% endblock %}

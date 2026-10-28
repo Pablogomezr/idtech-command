@@ -1,0 +1,74 @@
+# Laboratorio de IDtech Command en un PC con Docker Desktop: base de datos, central (portal en
+# http://localhost:8000) y agente vigilando los equipos reales de la oficina.
+#
+# NO es producción: sin HTTPS (cookie no segura), un solo PC. Los secretos van en un archivo
+# de entorno FUERA del repositorio (IDCMD_LAB/lab.env), creado por el script de laboratorio:
+#   docker compose --env-file C:\idtech-lab\lab.env -f despliegue\laboratorio\docker-compose.yml ...
+name: idcmd-lab
+
+x-endurecido: &endurecido
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: [/tmp]
+  restart: unless-stopped
+
+services:
+  bd:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${IDCMD_PG_CLAVE:?falta IDCMD_PG_CLAVE}
+    volumes: [bd:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # Tareas de una vez: migraciones, inventario, agente y usuarios del portal.
+  #   docker compose ... run --rm preparar
+  #   docker compose ... run --rm preparar idcmd-central usuarios crear --correo ... --rol admin
+  preparar:
+    image: idcmd-central:lab
+    build: {context: ../.., dockerfile: central/Dockerfile}
+    profiles: [herramientas]
+    command: >-
+      idcmd-central laboratorio preparar --inventario /lab/inventario.yaml --salida /lab/agente
+    environment:
+      IDCMD_DSN_ADMIN: postgresql://postgres:${IDCMD_PG_CLAVE}@bd:5432/postgres
+      IDCMD_CLAVE_SERVICIO: ${IDCMD_CLAVE_SERVICIO:?falta IDCMD_CLAVE_SERVICIO}
+      IDCMD_LLAVE_TOTP: ${IDCMD_LLAVE_TOTP:?falta IDCMD_LLAVE_TOTP}
+    volumes: ["${IDCMD_LAB:?falta IDCMD_LAB}:/lab"]
+    depends_on: {bd: {condition: service_healthy}}
+
+  central:
+    <<: *endurecido
+    image: idcmd-central:lab
+    build: {context: ../.., dockerfile: central/Dockerfile}
+    environment:
+      IDCMD_DSN: postgresql://idcmd_servicio:${IDCMD_CLAVE_SERVICIO}@bd:5432/postgres
+      IDCMD_LLAVE_TOTP: ${IDCMD_LLAVE_TOTP}
+      IDCMD_COOKIE_SEGURA: "false"   # solo laboratorio: http://localhost
+    ports: ["127.0.0.1:8000:8000"]   # solo desde este PC
+    sysctls:
+      # El agente comparte esta red: ping sin privilegios para el adaptador icmp.
+      net.ipv4.ping_group_range: "0 2147483647"
+    depends_on: {bd: {condition: service_healthy}}
+
+  agente:
+    <<: *endurecido
+    image: idcmd-agente:lab
+    build: ../../agente
+    # Comparte la red de la central: le habla por http://localhost:8000 (el agente solo
+    # acepta http sin TLS hacia localhost) y sale a la LAN de la oficina igual que antes.
+    network_mode: "service:central"
+    command: ["ejecutar"]
+    volumes:
+      - "${IDCMD_LAB}/agente:/config:ro"      # agente.yaml + token_agente (generados)
+      - "${IDCMD_LAB}/secretos:/secretos:ro"  # bóveda con las claves de los equipos
+      - agente_datos:/datos                   # buzón: nada se pierde si la central cae
+    depends_on: [central]
+
+volumes:
+  bd:
+  agente_datos:

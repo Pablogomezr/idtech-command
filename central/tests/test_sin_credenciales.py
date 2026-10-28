@@ -13,8 +13,9 @@ PATRON_SECRETO = re.compile(
 # Columnas permitidas, cada una con su razón.
 PERMITIDAS = {
     ("agentes", "token_hash"): "SHA-256 del token del agente; el token no se guarda",
-    ("usuarios", "hash_clave"): "argon2id de la clave del portal (usuarios de IDtech/cliente)",
+    ("usuarios", "hash_clave"): "bcrypt de la clave del portal; se verifica solo en la base",
     ("usuarios", "totp_cifrado"): "segundo factor del portal, cifrado",
+    ("sesiones", "token_hash"): "SHA-256 del token de sesión del portal; el token no se guarda",
     ("dispositivos", "credencial_ref"): "alias que el agente resuelve en su bóveda local",
 }
 

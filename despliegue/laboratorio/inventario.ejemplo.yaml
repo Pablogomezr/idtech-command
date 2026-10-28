@@ -1,0 +1,38 @@
+# Inventario de un sitio para `idcmd-central laboratorio preparar` (ver laboratorio.py).
+# Copiar a IDCMD_LAB/inventario.yaml y ajustar. Sin claves: credencial_ref es el nombre con
+# que la clave se guardó en la bóveda del agente (idcmd credenciales guardar <ref> ...).
+cliente: IDtech
+regional: Barranquilla
+sitio: Oficina IDtech
+ciudad: Barranquilla
+dispositivos:
+  - clave: nvr
+    nombre: NVR oficina
+    tipo_equipo: nvr
+    marca: dahua
+    modelo: DHI-NVR5432-EI
+    direccion: 192.168.1.108
+    credencial_ref: nvr          # cuenta propia del agente (idcmd_monitor)
+    retencion_contratada_dias: 30
+    canales: {1: camara_1, 2: camara_2}
+    chequeos:
+      - {adaptador: icmp}
+      - {adaptador: dahua_nvr, con_canales: true}
+      - {adaptador: dahua_retencion, intervalo_s: 900, deteccion: false, con_canales: true,
+         parametros: {retencion_contratada_dias: 30}}
+      - {adaptador: dahua_registro, intervalo_s: 300, deteccion: false}
+  - {clave: camara_1, nombre: Cámara 1, tipo_equipo: camara, marca: dahua}
+  - {clave: camara_2, nombre: Cámara 2, tipo_equipo: camara, marca: dahua}
+  - clave: panel
+    nombre: Panel de acceso
+    tipo_equipo: controladora
+    marca: hikvision
+    modelo: DS-K2602T
+    direccion: 192.168.1.80
+    credencial_ref: panel
+    chequeos:
+      - {adaptador: icmp}
+      - {adaptador: hikvision_acceso, parametros: {lectoras_direcciones: "1,3"}}
+      # Este panel solo admite la cuenta admin (ADR 0009, excepción).
+      - {adaptador: hikvision_registro, intervalo_s: 300, deteccion: false,
+         parametros: {cuenta_compartida: true}}

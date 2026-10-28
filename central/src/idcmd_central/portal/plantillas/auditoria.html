@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titulo %}Auditoría · {{ sitio.nombre }}{% endblock %}
+{% block contenido %}
+<div class="sub"><a href="/portal">Sitios</a> › {{ sitio.cliente }} › {{ sitio.regional }}</div>
+<h1>{{ sitio.nombre }}</h1>
+<nav class="pestanas">
+  <a href="/portal/sitios/{{ sitio.id }}">Estado</a>
+  <a class="activa" href="/portal/sitios/{{ sitio.id }}/auditoria">Auditoría</a>
+</nav>
+
+<h2>Accesos y operaciones en los equipos</h2>
+<div class="sub">Quién entró a cada equipo y qué hizo (últimas {{ operaciones|length }}). Las marcaciones de
+personas nunca salen del sitio.</div>
+<div class="tabla"><table>
+  <tr><th>Fecha (Bogotá)</th><th>Equipo</th><th>Operación</th><th>Cuenta</th><th>IP de origen</th><th>Detalle del equipo</th></tr>
+  {% for o in operaciones %}
+  <tr class="{% if o.tipo in CRITICAS %}critica{% endif %}">
+    <td>{{ o.ocurrido_at|hora('%Y-%m-%d %H:%M:%S') }}</td><td>{{ o.equipo }}</td>
+    <td>{{ OPERACIONES.get(o.tipo, o.tipo) }}</td><td>{{ o.cuenta or '—' }}</td>
+    <td>{{ o.ip_origen or '—' }}</td><td>{{ o.codigo_fabricante or '' }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6">Sin operaciones registradas.</td></tr>
+  {% endfor %}
+</table></div>
+
+<h2>Cambios de configuración detectados</h2>
+<div class="sub">Diferencias entre lecturas sucesivas de cada equipo (firmware, usuarios registrados,
+modos de verificación, discos...).</div>
+<div class="tabla"><table>
+  <tr><th>Fecha (Bogotá)</th><th>Equipo</th><th>Qué cambió</th><th>Antes</th><th>Después</th></tr>
+  {% for c in cambios %}
+    {% for k, v in c.despues.items() %}
+    <tr>
+      <td>{{ c.observado_at|hora('%Y-%m-%d %H:%M:%S') }}</td><td>{{ c.equipo }}</td>
+      <td>{{ METRICAS.get(k, k|legible) }}</td>
+      <td>{{ (c.antes or {}).get(k, '—')|valor }}</td><td>{{ v|valor }}</td>
+    </tr>
+    {% endfor %}
+  {% else %}
+  <tr><td colspan="5">Sin cambios registrados.</td></tr>
+  {% endfor %}
+</table></div>
+{% endblock %}

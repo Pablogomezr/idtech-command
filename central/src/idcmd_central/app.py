@@ -4,12 +4,27 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 
 from . import __version__
 from .db import BaseDatos
 from .ingesta.api import router as router_ingesta
+from .portal.rutas import router as router_portal
+
+# El portal no carga nada de terceros: htmx y la hoja de estilos se sirven desde aquí.
+CABECERAS_PORTAL = {
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+    "X-Frame-Options": "DENY",
+    "Cache-Control": "no-store",
+}
 
 
 def crear_app(bd: BaseDatos | None = None) -> FastAPI:
@@ -39,6 +54,22 @@ def crear_app(bd: BaseDatos | None = None) -> FastAPI:
     if bd is not None:
         app.state.bd = bd
     app.include_router(router_ingesta)
+    app.include_router(router_portal)
+    app.mount(
+        "/portal/estaticos",
+        StaticFiles(directory=Path(__file__).parent / "portal" / "estaticos"),
+        name="estaticos",
+    )
+
+    @app.middleware("http")
+    async def cabeceras_seguridad(request: Request, llamar):
+        respuesta = await llamar(request)
+        if request.url.path == "/" or request.url.path.startswith("/portal"):
+            for nombre, valor in CABECERAS_PORTAL.items():
+                if nombre == "Cache-Control" and "/estaticos/" in request.url.path:
+                    continue
+                respuesta.headers.setdefault(nombre, valor)
+        return respuesta
 
     @app.get("/salud")
     async def salud() -> dict:

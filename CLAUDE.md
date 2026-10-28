@@ -63,8 +63,10 @@ central/     FastAPI: ingesta + portal + worker (idcmd_central)
   src/idcmd_central/db.py        transacción con SET LOCAL ROLE + app.usuario_id/agente_id
   src/idcmd_central/ingesta/     POST /api/v1/ingesta
   src/idcmd_central/contrato.py  espejo del contrato; una prueba lo compara con el esquema
+  src/idcmd_central/portal/      ingreso (clave + TOTP), estado en vivo (HTMX), auditoría
+  src/idcmd_central/laboratorio.py  inventario YAML -> central + config del agente
 docs/        adr/, runbooks/, plantillas/, supuestos.md
-despliegue/  Caddy, compose de la central, aprovisionamiento del mini PC
+despliegue/  laboratorio/ (compose + iniciar.ps1 para un PC), minipc/ (nftables)
 ```
 
 ## Comandos
@@ -82,7 +84,10 @@ docker run -d --name idcmd-pg -e POSTGRES_PASSWORD=pruebas -p 55432:5432 postgre
 uv sync && uv run pytest -q
 IDCMD_DSN_ADMIN=... uv run idcmd-central migrar
 IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "..."
+IDCMD_DSN_ADMIN=... IDCMD_LLAVE_TOTP=... uv run idcmd-central usuarios crear --correo ... --rol admin
+docker build -f central/Dockerfile -t idcmd-central .   # desde la raíz del repositorio
 ```
+Laboratorio completo en un PC: `docs/runbooks/laboratorio.md`.
 
 ## Base de datos central (reglas)
 
@@ -94,6 +99,10 @@ IDCMD_DSN_ADMIN=... uv run idcmd-central agentes crear --sitio <uuid> --nombre "
 - Visibilidad: `idcmd.sitios_visibles()` (admin todo; técnico sus asignaciones vigentes;
   cliente su alcance cliente/regional/sitio). Escritura de inventario: solo Admin.
 - Hashes de tokens y claves del portal: el rol `idcmd_app` puede escribirlos, nunca leerlos.
+  La clave del portal se verifica DENTRO de Postgres (`idcmd.verificar_clave`, bcrypt); 5 fallos
+  (clave o código TOTP) bloquean 15 min y el contador solo se reinicia con clave Y código
+  correctos. Sesiones: la cookie lleva un token; la base guarda su SHA-256 (`idcmd.sesiones`,
+  solo por funciones).
 - `auditoria_accesos` solo admite INSERT.
 - Migraciones: nunca editar una ya aplicada en producción; crear la siguiente.
 - `agregados_hora` sin particionar (volumen manejable); se conservan 90 días.
@@ -167,5 +176,5 @@ Dahua: **nunca** usar `configManager.cgi` (RemoteDevice devuelve las claves de l
 | E1 | Núcleo del agente (este código), contrato v1 | ✅ Entrega 2 |
 | E1 | Central: esquema Postgres + RLS, API de ingesta | ✅ Entrega 3 |
 | E2 | Adaptadores Hikvision acceso, Dahua acceso/cámara/NVR/retención + `idcmd sondear` | ✅ Entrega 3b (validar en oficina) |
-| E1 | Portal mínimo con login MFA y estado en vivo + modo laboratorio | ⏳ Entrega 4 |
+| E1 | Portal mínimo con login MFA y estado en vivo + modo laboratorio | ✅ Entrega 4 (probado de punta a punta en contenedores; falta en la oficina) |
 | E2–E6 | Adaptadores, operación, PWA, piloto, SLA e informe | Pendiente |

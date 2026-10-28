@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}IDtech Command{% endblock %}</title>
+  <link rel="stylesheet" href="/portal/estaticos/portal.css">
+  <script src="/portal/estaticos/htmx.min.js" defer></script>
+</head>
+<body>
+{% if usuario %}
+<header class="barra">
+  <a class="marca" href="/portal">IDtech Command</a>
+  <span class="usuario">{{ usuario.nombre }} · {{ usuario.rol }}</span>
+  <form method="post" action="/portal/salir"><button class="discreto" type="submit">Salir</button></form>
+</header>
+{% endif %}
+<main>{% block contenido %}{% endblock %}</main>
+</body>
+</html>

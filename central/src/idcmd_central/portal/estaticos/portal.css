@@ -1,0 +1,72 @@
+/* IDtech Command — portal. Móvil primero; claro y oscuro según el sistema. */
+:root {
+  --fondo: #f5f6f8; --tarjeta: #ffffff; --texto: #1d2330; --suave: #5d6677; --borde: #dde1e8;
+  --marca: #0b5cad; --ok: #1f7a3f; --ok-f: #e3f3e8; --deg: #8a5a00; --deg-f: #fff3d6;
+  --caido: #b42318; --caido-f: #fde7e5; --nd: #4b5565; --nd-f: #eceef2;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #12151b; --tarjeta: #1b2029; --texto: #e7eaf0; --suave: #9aa3b2; --borde: #2c3340;
+    --marca: #5aa2ec; --ok: #5cc98a; --ok-f: #183224; --deg: #f0b84a; --deg-f: #352a12;
+    --caido: #ff7a6e; --caido-f: #3a1a17; --nd: #aab2c0; --nd-f: #262c36;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+       background: var(--fondo); color: var(--texto); }
+a { color: var(--marca); text-decoration: none; }
+a:hover { text-decoration: underline; }
+header.barra { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--tarjeta); border-bottom: 1px solid var(--borde); }
+header.barra .marca { font-weight: 700; color: var(--texto); }
+header.barra .usuario { margin-left: auto; color: var(--suave); font-size: 13px; }
+header.barra form { margin: 0; }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 20px; margin: 4px 0 4px; }
+h2 { font-size: 16px; margin: 24px 0 8px; }
+.sub { color: var(--suave); font-size: 13px; margin-bottom: 12px; }
+.tarjeta { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 10px; }
+.rejilla { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.pastilla { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px;
+  font-weight: 600; white-space: nowrap; }
+.e-ok { color: var(--ok); background: var(--ok-f); }
+.e-degradado { color: var(--deg); background: var(--deg-f); }
+.e-caido { color: var(--caido); background: var(--caido-f); }
+.e-desconocido, .e-sin_datos { color: var(--nd); background: var(--nd-f); }
+.borde-caido { border-left: 4px solid var(--caido); }
+.borde-degradado { border-left: 4px solid var(--deg); }
+.borde-desconocido, .borde-sin_datos { border-left: 4px solid var(--nd); }
+.borde-ok { border-left: 4px solid var(--ok); }
+.cifras { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; font-size: 13px; }
+.cifras b { font-size: 16px; }
+.equipo-cab { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.equipo-cab .nombre { font-weight: 600; }
+.equipo-cab .modelo { color: var(--suave); font-size: 13px; }
+.chequeo { border-top: 1px dashed var(--borde); margin-top: 8px; padding-top: 8px; }
+.chequeo .titulo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+.chequeo .codigo { font-weight: 600; }
+dl.metricas { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 6px 0 0;
+  font-size: 13px; }
+dl.metricas dt { color: var(--suave); }
+dl.metricas dd { margin: 0; word-break: break-word; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+th { color: var(--suave); font-weight: 600; }
+.tabla { overflow-x: auto; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px; }
+tr.critica td { background: var(--caido-f); }
+.ingreso { max-width: 360px; margin: 10vh auto; }
+.ingreso label { display: block; font-size: 13px; color: var(--suave); margin: 10px 0 4px; }
+.ingreso input { width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--borde);
+  border-radius: 8px; background: var(--fondo); color: var(--texto); }
+button { padding: 10px 16px; font-size: 15px; border: 0; border-radius: 8px; background: var(--marca);
+  color: #fff; cursor: pointer; }
+button.discreto { padding: 4px 10px; font-size: 13px; background: transparent; color: var(--marca);
+  border: 1px solid var(--borde); }
+.ingreso button { width: 100%; margin-top: 16px; }
+.error { color: var(--caido); background: var(--caido-f); padding: 8px 10px; border-radius: 8px;
+  font-size: 13px; }
+.vivo { font-size: 12px; color: var(--suave); }
+.alerta-agente { color: var(--caido); font-weight: 600; }
+nav.pestanas { display: flex; gap: 16px; margin: 4px 0 12px; font-size: 14px; }
+nav.pestanas a.activa { font-weight: 700; color: var(--texto); }

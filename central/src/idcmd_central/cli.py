@@ -3,19 +3,36 @@
 idcmd-central migrar
 idcmd-central agentes crear --sitio <uuid> --nombre "Mini PC sede norte"
 idcmd-central agentes revocar <agente_id>
+idcmd-central llave-totp                       # llave para cifrar los segundos factores
+idcmd-central usuarios crear --correo a@b.co --nombre "Pablo" --rol admin
+idcmd-central laboratorio preparar --inventario oficina.yaml --salida /lab
 """
 
 from __future__ import annotations
 
 import argparse
+import getpass
 import os
 import sys
 import uuid
+from pathlib import Path
 
 import psycopg
+import yaml
+from psycopg import sql
 
+from . import laboratorio
 from .migrar import migrar
+from .portal.seguridad import (
+    cifrar_secreto,
+    generar_llave,
+    generar_secreto,
+    llave_desde_entorno,
+    uri_totp,
+)
 from .tokens import generar_token, hash_token
+
+LONGITUD_MINIMA_CLAVE = 12
 
 
 def _dsn_admin() -> str:
@@ -62,6 +79,90 @@ def cmd_agentes_revocar(args) -> int:
     return 0 if n else 1
 
 
+def cmd_llave_totp(args) -> int:
+    print(generar_llave())
+    print("Guárdela como IDCMD_LLAVE_TOTP (secreto del servidor). Si se pierde, todos los")
+    print("usuarios deben volver a registrar su segundo factor.", file=sys.stderr)
+    return 0
+
+
+def crear_usuario(
+    dsn: str, correo: str, nombre: str, rol: str, clave: str
+) -> tuple[uuid.UUID, str]:
+    """Crea el usuario con clave (bcrypt en la base) y segundo factor obligatorio."""
+    secreto = generar_secreto()
+    cifrado = cifrar_secreto(secreto, llave_desde_entorno())
+    with psycopg.connect(dsn) as con:
+        fila = con.execute(
+            "INSERT INTO idcmd.usuarios (correo, nombre, rol, hash_clave, totp_cifrado)"
+            " VALUES (%s, %s, %s, crypt(%s, gen_salt('bf', 12)), %s) RETURNING id",
+            (correo, nombre, rol, clave, cifrado),
+        ).fetchone()
+    return fila[0], secreto
+
+
+def cmd_usuarios_crear(args) -> int:
+    clave = getpass.getpass("Clave del portal (mínimo 12 caracteres): ")
+    if len(clave) < LONGITUD_MINIMA_CLAVE:
+        sys.exit("la clave debe tener al menos 12 caracteres")
+    if getpass.getpass("Repita la clave: ") != clave:
+        sys.exit("las claves no coinciden")
+    usuario_id, secreto = crear_usuario(_dsn_admin(), args.correo, args.nombre, args.rol, clave)
+    print(f"usuario creado: {usuario_id} ({args.rol})")
+    print()
+    print("Segundo factor: en Google o Microsoft Authenticator, 'Agregar cuenta' ->")
+    print("'Ingresar una clave de configuración' (o escanee la URI):")
+    print(f"  cuenta: {args.correo}")
+    print(f"  clave:  {secreto}")
+    print(f"  URI:    {uri_totp(secreto, args.correo)}")
+    print("Esta clave se muestra UNA sola vez.")
+    return 0
+
+
+def cmd_laboratorio_preparar(args) -> int:
+    """Base al día, rol de servicio de la aplicación, inventario, agente y su config."""
+    dsn = _dsn_admin()
+    aplicadas = migrar(dsn)
+    print("migraciones: " + (", ".join(aplicadas) or "al día"))
+
+    clave_servicio = os.environ.get("IDCMD_CLAVE_SERVICIO")
+    if clave_servicio:
+        with psycopg.connect(dsn, autocommit=True) as con:
+            existe = con.execute("SELECT 1 FROM pg_roles WHERE rolname = 'idcmd_servicio'")
+            orden = "ALTER" if existe.fetchone() else "CREATE"
+            con.execute(
+                sql.SQL(orden + " ROLE idcmd_servicio LOGIN NOINHERIT PASSWORD {}").format(
+                    sql.Literal(clave_servicio)
+                )
+            )
+            con.execute("GRANT idcmd_app, idcmd_ingesta TO idcmd_servicio")
+        print("rol de servicio idcmd_servicio: listo")
+
+    datos = laboratorio.leer(args.inventario)
+    resultado = laboratorio.cargar(dsn, datos)
+    print(f"sitio '{datos['sitio']}': {resultado.sitio_id} ({len(resultado.dispositivos)} equipos)")
+
+    salida: Path = args.salida
+    salida.mkdir(parents=True, exist_ok=True)
+    archivo_config, archivo_token = salida / "agente.yaml", salida / "token_agente"
+    agente_id = None
+    if archivo_config.exists() and archivo_token.exists():
+        previo = yaml.safe_load(archivo_config.read_text(encoding="utf-8")) or {}
+        agente_id = uuid.UUID(previo["agente_id"]) if previo.get("agente_id") else None
+    if agente_id is None:
+        agente_id, token = crear_agente(dsn, resultado.sitio_id, "Agente de laboratorio")
+        archivo_token.write_text(token + "\n", encoding="utf-8")
+        print(f"agente creado: {agente_id} (token en {archivo_token})")
+    config = laboratorio.config_agente(datos, resultado, agente_id, args.url_central)
+    archivo_config.write_text(
+        "# Generado por 'idcmd-central laboratorio preparar'. No lleva claves.\n"
+        + yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    print(f"configuración del agente: {archivo_config} ({len(config['objetivos'])} objetivos)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="idcmd-central")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -74,5 +175,18 @@ def main(argv: list[str] | None = None) -> int:
     revocar = agentes.add_parser("revocar")
     revocar.add_argument("agente_id", type=uuid.UUID)
     revocar.set_defaults(fn=cmd_agentes_revocar)
+    sub.add_parser("llave-totp").set_defaults(fn=cmd_llave_totp)
+    usuarios = sub.add_parser("usuarios").add_subparsers(dest="accion", required=True)
+    u_crear = usuarios.add_parser("crear")
+    u_crear.add_argument("--correo", required=True)
+    u_crear.add_argument("--nombre", required=True)
+    u_crear.add_argument("--rol", choices=["admin", "tecnico", "cliente"], required=True)
+    u_crear.set_defaults(fn=cmd_usuarios_crear)
+    lab = sub.add_parser("laboratorio").add_subparsers(dest="accion", required=True)
+    preparar = lab.add_parser("preparar")
+    preparar.add_argument("--inventario", type=Path, required=True)
+    preparar.add_argument("--salida", type=Path, required=True)
+    preparar.add_argument("--url-central", default="http://localhost:8000")
+    preparar.set_defaults(fn=cmd_laboratorio_preparar)
     args = p.parse_args(argv)
     return args.fn(args)

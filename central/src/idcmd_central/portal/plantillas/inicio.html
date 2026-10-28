@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Sitios</h1>
+<div class="sub">{{ sitios|length }} sitio(s) visibles para su usuario</div>
+<div class="rejilla">
+{% for s in sitios %}
+  {% set peor = 'caido' if s.caidos else ('degradado' if s.degradados else ('desconocido' if s.sin_dato else 'ok')) %}
+  <a class="tarjeta borde-{{ peor }}" href="/portal/sitios/{{ s.id }}" style="color:inherit;text-decoration:none">
+    <div class="equipo-cab"><span class="nombre">{{ s.nombre }}</span>
+      <span class="pastilla e-{{ peor }}">{{ ESTADOS[peor] }}</span></div>
+    <div class="sub" style="margin:2px 0 0">{{ s.cliente }}{% if s.ciudad %} · {{ s.ciudad }}{% endif %}</div>
+    <div class="cifras">
+      <span><b>{{ s.equipos }}</b> {{ 'equipo' if s.equipos == 1 else 'equipos' }}</span>
+      <span><b>{{ s.caidos }}</b> {{ 'caído' if s.caidos == 1 else 'caídos' }}</span>
+      <span><b>{{ s.degradados }}</b> con novedad</span>
+    </div>
+    {% set minutos = ((ahora - s.ultimo_latido).total_seconds() / 60) if s.ultimo_latido else none %}
+    <div class="vivo {% if minutos is none or minutos > 5 %}alerta-agente{% endif %}">
+      Agente: {{ hace(s.ultimo_latido, ahora) }}
+    </div>
+  </a>
+{% else %}
+  <div class="tarjeta">No tiene sitios asignados. Pida acceso al administrador de IDtech.</div>
+{% endfor %}
+</div>
+{% endblock %}
