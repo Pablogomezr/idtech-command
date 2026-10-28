@@ -101,21 +101,70 @@ def crear_usuario(
     return fila[0], secreto
 
 
-def cmd_usuarios_crear(args) -> int:
+def restablecer_mfa(dsn: str, correo: str, clave: str | None = None) -> str:
+    """Nuevo segundo factor (celular perdido o clave de configuración no guardada). Cierra
+    las sesiones abiertas y quita el bloqueo; con `clave`, también cambia la clave."""
+    secreto = generar_secreto()
+    cifrado = cifrar_secreto(secreto, llave_desde_entorno())
+    with psycopg.connect(dsn) as con, con.transaction():
+        fila = con.execute(
+            "UPDATE idcmd.usuarios SET totp_cifrado = %s, intentos_fallidos = 0,"
+            " bloqueado_hasta = NULL,"
+            " hash_clave = coalesce(crypt(%s, gen_salt('bf', 12)), hash_clave)"
+            " WHERE correo = %s RETURNING id",
+            (cifrado, clave, correo),
+        ).fetchone()
+        if fila is None:
+            raise LookupError(f"no existe el usuario {correo}")
+        con.execute(
+            "UPDATE idcmd.sesiones SET cerrada_at = now()"
+            " WHERE usuario_id = %s AND cerrada_at IS NULL",
+            (fila[0],),
+        )
+    return secreto
+
+
+def _pedir_clave() -> str:
     clave = getpass.getpass("Clave del portal (mínimo 12 caracteres): ")
     if len(clave) < LONGITUD_MINIMA_CLAVE:
         sys.exit("la clave debe tener al menos 12 caracteres")
     if getpass.getpass("Repita la clave: ") != clave:
         sys.exit("las claves no coinciden")
-    usuario_id, secreto = crear_usuario(_dsn_admin(), args.correo, args.nombre, args.rol, clave)
-    print(f"usuario creado: {usuario_id} ({args.rol})")
+    return clave
+
+
+def _mostrar_segundo_factor(correo: str, secreto: str) -> None:
     print()
     print("Segundo factor: en Google o Microsoft Authenticator, 'Agregar cuenta' ->")
     print("'Ingresar una clave de configuración' (o escanee la URI):")
-    print(f"  cuenta: {args.correo}")
+    print(f"  cuenta: {correo}")
     print(f"  clave:  {secreto}")
-    print(f"  URI:    {uri_totp(secreto, args.correo)}")
-    print("Esta clave se muestra UNA sola vez.")
+    print(f"  URI:    {uri_totp(secreto, correo)}")
+    print("Esta clave se muestra UNA sola vez. Agréguela al celular antes de cerrar esta ventana.")
+
+
+def cmd_usuarios_restablecer_mfa(args) -> int:
+    clave = _pedir_clave() if args.nueva_clave else None
+    try:
+        secreto = restablecer_mfa(_dsn_admin(), args.correo, clave)
+    except LookupError as e:
+        sys.exit(str(e))
+    print(f"segundo factor restablecido para {args.correo}; sesiones abiertas cerradas")
+    _mostrar_segundo_factor(args.correo, secreto)
+    return 0
+
+
+def cmd_usuarios_crear(args) -> int:
+    clave = _pedir_clave()
+    try:
+        usuario_id, secreto = crear_usuario(_dsn_admin(), args.correo, args.nombre, args.rol, clave)
+    except psycopg.errors.UniqueViolation:
+        sys.exit(
+            f"ya existe un usuario con el correo {args.correo}. Si perdió el segundo factor:"
+            f" idcmd-central usuarios restablecer-mfa --correo {args.correo}"
+        )
+    print(f"usuario creado: {usuario_id} ({args.rol})")
+    _mostrar_segundo_factor(args.correo, secreto)
     return 0
 
 
@@ -182,6 +231,10 @@ def main(argv: list[str] | None = None) -> int:
     u_crear.add_argument("--nombre", required=True)
     u_crear.add_argument("--rol", choices=["admin", "tecnico", "cliente"], required=True)
     u_crear.set_defaults(fn=cmd_usuarios_crear)
+    u_mfa = usuarios.add_parser("restablecer-mfa", help="nuevo segundo factor para un usuario")
+    u_mfa.add_argument("--correo", required=True)
+    u_mfa.add_argument("--nueva-clave", action="store_true", help="cambiar también la clave")
+    u_mfa.set_defaults(fn=cmd_usuarios_restablecer_mfa)
     lab = sub.add_parser("laboratorio").add_subparsers(dest="accion", required=True)
     preparar = lab.add_parser("preparar")
     preparar.add_argument("--inventario", type=Path, required=True)

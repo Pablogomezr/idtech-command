@@ -19,6 +19,9 @@ migraciones, carga el inventario, crea el agente y su configuración (`C:\idtech
 pide el correo del usuario administrador del portal: muestra UNA vez la clave para Google o
 Microsoft Authenticator.
 
+¿Perdió el celular o no guardó la clave de configuración? Repita con `-RestablecerMfa`: entrega
+un segundo factor nuevo y cierra las sesiones abiertas (`idcmd-central usuarios restablecer-mfa`).
+
 ## Qué verificar
 - El portal muestra el sitio y "último contacto del agente: hace un momento".
 - Cada equipo con sus chequeos; la página se actualiza sola cada 15 s.

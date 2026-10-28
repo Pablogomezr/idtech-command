@@ -3,8 +3,10 @@
 #   powershell -ExecutionPolicy Bypass -File C:\idtech-command-vNN\despliegue\laboratorio\iniciar.ps1
 # Requiere: C:\idtech-lab\inventario.yaml (equipos) y C:\idtech-lab\secretos (bóveda del agente,
 # creada con 'idcmd credenciales guardar'). Ninguna clave pasa por este script.
+# Con -RestablecerMfa entrega un segundo factor nuevo (celular perdido o clave no guardada).
 param(
-  [string]$Lab = "C:\idtech-lab"
+  [string]$Lab = "C:\idtech-lab",
+  [switch]$RestablecerMfa
 )
 $Repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 
@@ -48,12 +50,23 @@ docker @C up -d bd
 docker @C run --rm preparar
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
-if (-not (Test-Path "$Lab\.usuario-creado")) {
+if ($RestablecerMfa) {
+  Write-Host "`n== 3. Nuevo segundo factor para su usuario ==" -ForegroundColor Cyan
+  $correo = Read-Host "Correo con que ingresa al portal"
+  docker @C run --rm -it preparar idcmd-central usuarios restablecer-mfa --correo $correo
+  if ($LASTEXITCODE -ne 0) { exit 1 }
+  New-Item -ItemType File -Force "$Lab\.usuario-creado" | Out-Null
+  Write-Host "Agregue la clave de configuración a Google o Microsoft Authenticator AHORA." -ForegroundColor Yellow
+  Read-Host "Presione Enter cuando la haya agregado"
+} elseif (-not (Test-Path "$Lab\.usuario-creado")) {
   Write-Host "`n== 3. Su usuario del portal (administrador) ==" -ForegroundColor Cyan
   $correo = Read-Host "Correo para ingresar al portal"
   $nombre = Read-Host "Su nombre"
   docker @C run --rm -it preparar idcmd-central usuarios crear --correo $correo --nombre $nombre --rol admin
-  if ($LASTEXITCODE -ne 0) { exit 1 }
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "Si el usuario ya existía, repita con -RestablecerMfa." -ForegroundColor Yellow
+    exit 1
+  }
   New-Item -ItemType File "$Lab\.usuario-creado" | Out-Null
   Write-Host "Agregue la clave de configuración a Google o Microsoft Authenticator AHORA." -ForegroundColor Yellow
   Read-Host "Presione Enter cuando la haya agregado"

@@ -273,3 +273,16 @@ dispositivos:
     assert nvr.credencial_ref == "nvr"
     ping = next(o for o in validada.objetivos if o.adaptador == "icmp")
     assert ping.credencial_ref is None
+
+
+async def test_restablecer_mfa_cierra_sesiones_y_el_codigo_viejo_deja_de_servir(
+    portal, credenciales, base_pruebas
+):
+    from idcmd_central.cli import restablecer_mfa
+
+    await _entrar(portal, "admin", credenciales["admin"])
+    assert (await portal.get("/portal")).status_code == 200
+    nuevo = restablecer_mfa(base_pruebas["dueno"], "admin@prueba.co")
+    assert (await portal.get("/portal")).status_code == 303  # la sesión abierta se cerró
+    assert (await _entrar(portal, "admin", credenciales["admin"])).status_code == 401
+    assert (await _entrar(portal, "admin", nuevo)).status_code == 303
