@@ -5,6 +5,8 @@ idcmd-central agentes crear --sitio <uuid> --nombre "Mini PC sede norte"
 idcmd-central agentes revocar <agente_id>
 idcmd-central llave-totp                       # llave para cifrar los segundos factores
 idcmd-central usuarios crear --correo a@b.co --nombre "Pablo" --rol admin
+idcmd-central preparar                         # producción: migraciones + rol de servicio
+idcmd-central inventario cargar --inventario sitio.yaml --salida /agente --url-central https://...
 idcmd-central laboratorio preparar --inventario oficina.yaml --salida /lab
 idcmd-central usuarios telegram --correo a@b.co --chat-id 123456789
 idcmd-central worker                          # tickets, escalamiento, SLA y avisos
@@ -205,25 +207,38 @@ def cmd_usuarios_crear(args) -> int:
     return 0
 
 
-def cmd_laboratorio_preparar(args) -> int:
-    """Base al día, rol de servicio de la aplicación, inventario, agente y su config."""
-    dsn = _dsn_admin()
+def asegurar_rol_servicio(dsn: str, clave: str) -> None:
+    """Rol de login de la aplicación: NOINHERIT, solo actúa tras SET LOCAL ROLE (ver db.py)."""
+    with psycopg.connect(dsn, autocommit=True) as con:
+        existe = con.execute("SELECT 1 FROM pg_roles WHERE rolname = 'idcmd_servicio'")
+        orden = "ALTER" if existe.fetchone() else "CREATE"
+        con.execute(
+            sql.SQL(orden + " ROLE idcmd_servicio LOGIN NOINHERIT PASSWORD {}").format(
+                sql.Literal(clave)
+            )
+        )
+        con.execute("GRANT idcmd_app, idcmd_ingesta, idcmd_worker TO idcmd_servicio")
+
+
+def _migrar_y_rol(dsn: str) -> None:
     aplicadas = migrar(dsn)
     print("migraciones: " + (", ".join(aplicadas) or "al día"))
-
-    clave_servicio = os.environ.get("IDCMD_CLAVE_SERVICIO")
-    if clave_servicio:
-        with psycopg.connect(dsn, autocommit=True) as con:
-            existe = con.execute("SELECT 1 FROM pg_roles WHERE rolname = 'idcmd_servicio'")
-            orden = "ALTER" if existe.fetchone() else "CREATE"
-            con.execute(
-                sql.SQL(orden + " ROLE idcmd_servicio LOGIN NOINHERIT PASSWORD {}").format(
-                    sql.Literal(clave_servicio)
-                )
-            )
-            con.execute("GRANT idcmd_app, idcmd_ingesta, idcmd_worker TO idcmd_servicio")
+    if clave_servicio := os.environ.get("IDCMD_CLAVE_SERVICIO"):
+        asegurar_rol_servicio(dsn, clave_servicio)
         print("rol de servicio idcmd_servicio: listo")
 
+
+def cmd_preparar(args) -> int:
+    """Producción: base al día y rol de la aplicación. Se puede repetir en cada actualización."""
+    if not os.environ.get("IDCMD_CLAVE_SERVICIO"):
+        sys.exit("defina IDCMD_CLAVE_SERVICIO (clave del rol de login de la aplicación)")
+    _migrar_y_rol(_dsn_admin())
+    return 0
+
+
+def cmd_inventario_cargar(args) -> int:
+    """Sitio y equipos desde el YAML, agente del sitio y su configuración (sin claves)."""
+    dsn = _dsn_admin()
     datos = laboratorio.leer(args.inventario)
     resultado = laboratorio.cargar(dsn, datos)
     print(f"sitio '{datos['sitio']}': {resultado.sitio_id} ({len(resultado.dispositivos)} equipos)")
@@ -236,17 +251,23 @@ def cmd_laboratorio_preparar(args) -> int:
         previo = yaml.safe_load(archivo_config.read_text(encoding="utf-8")) or {}
         agente_id = uuid.UUID(previo["agente_id"]) if previo.get("agente_id") else None
     if agente_id is None:
-        agente_id, token = crear_agente(dsn, resultado.sitio_id, "Agente de laboratorio")
+        agente_id, token = crear_agente(dsn, resultado.sitio_id, f"Agente {datos['sitio']}")
         archivo_token.write_text(token + "\n", encoding="utf-8")
         print(f"agente creado: {agente_id} (token en {archivo_token})")
     config = laboratorio.config_agente(datos, resultado, agente_id, args.url_central)
     archivo_config.write_text(
-        "# Generado por 'idcmd-central laboratorio preparar'. No lleva claves.\n"
+        "# Generado por 'idcmd-central inventario cargar'. No lleva claves.\n"
         + yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
     print(f"configuración del agente: {archivo_config} ({len(config['objetivos'])} objetivos)")
     return 0
+
+
+def cmd_laboratorio_preparar(args) -> int:
+    """Todo junto para un PC: base al día, rol de servicio, inventario, agente y su config."""
+    _migrar_y_rol(_dsn_admin())
+    return cmd_inventario_cargar(args)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -279,6 +300,15 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("worker", help="servicio: tickets, escalamiento, SLA y avisos").set_defaults(
         fn=cmd_worker
     )
+    sub.add_parser("preparar", help="migraciones y rol de servicio (producción)").set_defaults(
+        fn=cmd_preparar
+    )
+    inventario = sub.add_parser("inventario").add_subparsers(dest="accion", required=True)
+    cargar = inventario.add_parser("cargar", help="sitio, equipos y agente desde un YAML")
+    cargar.add_argument("--inventario", type=Path, required=True)
+    cargar.add_argument("--salida", type=Path, required=True)
+    cargar.add_argument("--url-central", required=True, help="p. ej. https://command.idtech.com.co")
+    cargar.set_defaults(fn=cmd_inventario_cargar)
     lab = sub.add_parser("laboratorio").add_subparsers(dest="accion", required=True)
     preparar = lab.add_parser("preparar")
     preparar.add_argument("--inventario", type=Path, required=True)

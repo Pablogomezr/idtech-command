@@ -50,7 +50,8 @@ services:
       IDCMD_LLAVE_TOTP: ${IDCMD_LLAVE_TOTP}
       IDCMD_COOKIE_SEGURA: "false"   # solo laboratorio: http://localhost
       IDCMD_URL_PUBLICA: ${IDCMD_URL_PUBLICA:-http://localhost:8000}
-    ports: ["127.0.0.1:8000:8000"]   # solo desde este PC
+    # Solo desde este PC; con iniciar.ps1 -Red también desde la Wi-Fi/LAN de la oficina.
+    ports: ["${IDCMD_ESCUCHAR:-127.0.0.1}:8000:8000"]
     volumes: [archivos:/datos/archivos]   # fotos y firmas de los servicios
     sysctls:
       # El agente comparte esta red: ping sin privilegios para el adaptador icmp.
@@ -88,6 +89,20 @@ services:
       - "${IDCMD_LAB}/agente:/config:ro"      # agente.yaml + token_agente (generados)
       - "${IDCMD_LAB}/secretos:/secretos:ro"  # bóveda con las claves de los equipos
       - agente_datos:/datos                   # buzón: nada se pierde si la central cae
+    depends_on: [central]
+
+  # Solo para demostraciones (iniciar.ps1 -Compartir): enlace https temporal de Cloudflare
+  # (*.trycloudflare.com) hacia el portal, para abrirlo desde otro PC o un celular. Sin cuenta
+  # ni puertos abiertos: sale de este PC. El enlace cambia cada vez y muere al detenerlo.
+  # El tráfico pasa por Cloudflare (fuera de Colombia): solo para mostrar el laboratorio, nunca
+  # con datos de clientes.
+  tunel:
+    <<: *endurecido
+    image: cloudflare/cloudflared:2026.9.3
+    profiles: [compartir]
+    command: ["tunnel", "--no-autoupdate", "--url", "http://central:8000"]
+    read_only: false   # cloudflared puede escribir su estado; sigue sin privilegios
+    restart: "no"
     depends_on: [central]
 
 volumes:

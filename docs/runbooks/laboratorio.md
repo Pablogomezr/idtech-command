@@ -51,7 +51,23 @@ administradores, que pueden "Tomar este servicio".
 - Sin correo ni Telegram configurados, los avisos se ven en el portal, menú "Avisos".
 
 ## App del técnico en el celular
-- En el laboratorio el portal solo escucha en este PC (127.0.0.1). Para probar desde el celular
-  en la misma red, la ubicación y la instalación como app exigen HTTPS: se habilita con el
-  despliegue en la nube (OCI) o con un túnel HTTPS; mientras tanto se prueba en el navegador del PC.
+- En el laboratorio el portal solo escucha en este PC (127.0.0.1). La ubicación y la instalación
+  como app exigen HTTPS: use `-Compartir` (abajo) o el despliegue en la nube.
 - Para confirmar la llegada, el sitio necesita `lat` y `lon` en `inventario.yaml`.
+
+## Presentarlo a clientes (otro PC o celular)
+Mientras la central de producción no esté publicada, el laboratorio se puede mostrar así:
+
+- **Desde cualquier lugar, con HTTPS** (celular con datos, PC del cliente):
+  `iniciar.ps1 -Compartir`. Imprime un enlace `https://<palabras>.trycloudflare.com/portal`
+  (túnel temporal de Cloudflare, sin cuenta ni puertos abiertos). En el celular funcionan la app
+  del técnico, la ubicación y las fotos. El enlace cambia en cada arranque.
+- **En la misma Wi-Fi de la oficina**, sin internet de por medio: `iniciar.ps1 -Red` y abrir
+  `http://<IP del PC>:8000/portal` (sin HTTPS: sin ubicación ni instalación como app).
+- Al terminar: `iniciar.ps1 -DejarDeCompartir` (el portal vuelve a solo este PC).
+
+Cuidados: el enlace muestra la pantalla de ingreso a cualquiera que lo tenga (clave + código de
+la app, 5 fallos bloquean 15 min); el tráfico del túnel pasa por Cloudflare, fuera de Colombia,
+así que es solo para demostraciones con los equipos de la oficina, nunca con datos de clientes.
+Para que el cliente vea "su" vista sin su propio celular de autenticación, muéstrele el
+**enlace de seguimiento** de un ticket (solo lectura, sin ingreso).

@@ -4,9 +4,16 @@
 # Requiere: C:\idtech-lab\inventario.yaml (equipos) y C:\idtech-lab\secretos (bóveda del agente,
 # creada con 'idcmd credenciales guardar'). Ninguna clave pasa por este script.
 # Con -RestablecerMfa entrega un segundo factor nuevo (celular perdido o clave no guardada).
+# Con -Compartir abre además un enlace https temporal para ver el portal desde otro PC o un
+# celular (demostraciones). Se cierra con -DejarDeCompartir.
+# Con -Red el portal se abre también a los equipos de la misma Wi-Fi/LAN (sin internet de por
+# medio): http://<IP de este PC>:8000.
 param(
   [string]$Lab = "C:\idtech-lab",
-  [switch]$RestablecerMfa
+  [switch]$RestablecerMfa,
+  [switch]$Compartir,
+  [switch]$DejarDeCompartir,
+  [switch]$Red
 )
 $Repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 
@@ -40,6 +47,15 @@ if (-not (Test-Path $envFile)) {
 }
 
 $C = @("compose", "--env-file", $envFile, "-f", "$Repo\despliegue\laboratorio\docker-compose.yml")
+
+if ($DejarDeCompartir) {
+  docker @C --profile compartir rm -sf tunel
+  $env:IDCMD_URL_PUBLICA = "http://localhost:8000"
+  $env:IDCMD_ESCUCHAR = "127.0.0.1"
+  docker @C up -d central worker agente
+  Write-Host "Enlace público cerrado. El portal queda solo en http://localhost:8000" -ForegroundColor Green
+  exit 0
+}
 
 Write-Host "`n== 1. Construir imágenes (la primera vez tarda unos minutos) ==" -ForegroundColor Cyan
 docker @C build
@@ -75,9 +91,54 @@ if ($RestablecerMfa) {
 }
 
 Write-Host "`n== 4. Central, servicio (tickets) y agente ==" -ForegroundColor Cyan
+$portal = "http://localhost:8000"
+$ipLocal = $null
+if ($Red) {
+  $ipLocal = (Get-NetIPAddress -AddressFamily IPv4 |
+    Where-Object { $_.PrefixOrigin -in @("Dhcp", "Manual") -and $_.IPAddress -notlike "169.254*" -and $_.InterfaceAlias -notmatch "vEthernet|WSL|Docker" } |
+    Select-Object -First 1).IPAddress
+  if (-not $ipLocal) { Write-Host "No encontré la IP de este PC en la red local." -ForegroundColor Red; exit 1 }
+  $env:IDCMD_ESCUCHAR = "0.0.0.0"
+  $env:IDCMD_URL_PUBLICA = "http://${ipLocal}:8000"
+}
+if ($Compartir) {
+  docker @C up -d central
+  docker @C --profile compartir up -d tunel
+  Write-Host "Abriendo el enlace público (hasta 60 s)..."
+  $url = $null
+  for ($i = 0; $i -lt 30 -and -not $url; $i++) {
+    Start-Sleep -Seconds 2
+    # El enlace es https://<palabras-al-azar>.trycloudflare.com (no el de la API).
+    $url = ((docker @C --profile compartir logs tunel 2>&1 | Out-String) |
+      Select-String -Pattern "https://[a-z0-9-]+\.trycloudflare\.com" -AllMatches).Matches |
+      ForEach-Object { $_.Value } | Where-Object { $_ -ne "https://api.trycloudflare.com" } |
+      Select-Object -First 1
+  }
+  if (-not $url) {
+    Write-Host "No se obtuvo el enlace. Revise: docker $($C -join ' ') --profile compartir logs tunel" -ForegroundColor Red
+    exit 1
+  }
+  # Los enlaces de los avisos y del seguimiento del cliente apuntan al enlace público.
+  $env:IDCMD_URL_PUBLICA = $url
+  $portal = $url
+}
 docker @C up -d central worker agente
 Start-Sleep -Seconds 5
 docker @C ps
-Start-Process "http://localhost:8000"
+Start-Process $portal
+if ($Compartir) {
+  Write-Host "`n=== ENLACE PARA OTRO PC O CELULAR ===" -ForegroundColor Yellow
+  Write-Host "  $url/portal" -ForegroundColor Yellow
+  Write-Host "Cualquiera con el enlace ve la pantalla de ingreso (clave + código de la app)."
+  Write-Host "El enlace cambia cada vez. Al terminar la presentación ciérrelo con:"
+  Write-Host "  powershell -ExecutionPolicy Bypass -File `"$PSCommandPath`" -DejarDeCompartir"
+}
+if ($Red) {
+  Write-Host "`n=== DESDE OTRO PC O CELULAR EN LA MISMA WI-FI ===" -ForegroundColor Yellow
+  Write-Host "  http://${ipLocal}:8000/portal" -ForegroundColor Yellow
+  Write-Host "Si no abre, permita Docker Desktop en el Firewall de Windows (redes privadas)."
+  Write-Host "Sin https el celular no instala la app del técnico ni comparte la ubicación (use -Compartir)."
+  Write-Host "Para volver a solo este PC: -DejarDeCompartir"
+}
 Write-Host "`nPortal: http://localhost:8000   (detener: docker $($C -join ' ') down)" -ForegroundColor Green
 Write-Host "Registro del agente: docker $($C -join ' ') logs -f agente" -ForegroundColor Green
