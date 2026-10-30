@@ -24,7 +24,11 @@ if ($Servidor -notmatch '^\d+\.\d+\.\d+\.\d+$') {
     exit 1
   }
 }
-if (-not (Test-NetConnection $Servidor -Port 22 -InformationLevel Quiet -WarningAction SilentlyContinue)) {
+# Conexión TCP directa con 10 s de espera (Test-NetConnection dio falsos negativos en Windows).
+$tcp = New-Object Net.Sockets.TcpClient
+$abierto = $false
+try { $abierto = $tcp.ConnectAsync($Servidor, 22).Wait(10000) -and $tcp.Connected } catch { } finally { $tcp.Dispose() }
+if (-not $abierto) {
   Write-Host "El servidor $Servidor no responde en el puerto 22. Revise:" -ForegroundColor Red
   Write-Host "  - que sea la IP real del servidor (Oracle: Compute > Instances > idcmd-central);"
   Write-Host "  - que el servidor esté RUNNING;"
