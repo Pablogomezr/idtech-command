@@ -1,0 +1,30 @@
+# Agente de IDtech Command en un sitio (PC con Docker Desktop o mini PC), conectado a la central
+# de producción por HTTPS. Solo conexiones salientes: ningún puerto abierto en el sitio.
+#
+# Lo maneja conectar-sitio.ps1. Carpeta del sitio (IDCMD_SITIO), fuera del repositorio:
+#   agente/agente.yaml + agente/token_agente   (generados en la central, sin claves de equipos)
+#   secretos/                                   (bóveda con las claves de los equipos; solo aquí)
+name: idcmd-sitio
+
+services:
+  agente:
+    image: idcmd-agente:sitio
+    build: ../../agente
+    command: ["ejecutar"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
+    restart: unless-stopped
+    sysctls:
+      net.ipv4.ping_group_range: "0 2147483647"   # ping sin privilegios (adaptador icmp)
+    volumes:
+      - "${IDCMD_SITIO:?falta IDCMD_SITIO}/agente:/config:ro"
+      - "${IDCMD_SECRETOS:?falta IDCMD_SECRETOS}:/secretos:ro"
+      - datos:/datos   # buzón: si la central o internet caen, nada se pierde
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+
+volumes:
+  datos:

@@ -70,7 +70,9 @@ central/     FastAPI: ingesta + portal + worker (idcmd_central)
                                  base de conocimiento (copia de docs/plantillas) y almacén de fotos
   src/idcmd_central/portal/campo.py  app del técnico: llegada, pasos, fotos, firma, acta, PWA
 docs/        adr/, runbooks/, plantillas/, supuestos.md
-despliegue/  laboratorio/ (compose + iniciar.ps1 para un PC), minipc/ (nftables)
+despliegue/  laboratorio/ (compose + iniciar.ps1 para un PC), minipc/ (nftables),
+             oci/ (Cloud Shell: red, servidor, IP, bucket), produccion/ (Caddy HTTPS, instalar.sh,
+             respaldos GPG cada 6 h, prueba de restauración), sitio/ (agente -> central, conectar-sitio.ps1)
 ```
 
 ## Comandos
@@ -189,4 +191,5 @@ Dahua: **nunca** usar `configManager.cgi` (RemoteDevice devuelve las claves de l
 | E1 | Portal mínimo con login MFA y estado en vivo + modo laboratorio | ✅ Entrega 4 (probado de punta a punta en contenedores; falta en la oficina) |
 | E3 | Servicio parte 1: tickets automáticos, asignación/escalamiento, SLA, avisos, seguimiento | ✅ Entrega 5 (probado de punta a punta en contenedores) |
 | E3 | Servicio parte 2: PWA del técnico (llegada con ubicación, pasos, fotos, firma, acta) | ✅ Entrega 6 (probado en celular emulado con GPS) |
+| E5 | Producción: central en OCI Bogotá con HTTPS, respaldos cifrados, agente de sitio | ✅ Entrega 7 (publicada en command.idtech.com.co) |
 | E3–E6 | Servicio parte 3 (acta PDF, encuesta), informe SLA mensual, piloto | Pendiente |

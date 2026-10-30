@@ -20,7 +20,12 @@
     </div>
   </a>
 {% else %}
+  {% if usuario.rol == 'admin' %}
+  <div class="tarjeta">Todavía no hay sitios. Conecte el primero con <code>conectar-sitio.ps1</code>
+    (guía "Conectar un sitio a la central").</div>
+  {% else %}
   <div class="tarjeta">No tiene sitios asignados. Pida acceso al administrador de IDtech.</div>
+  {% endif %}
 {% endfor %}
 </div>
 {% endblock %}
