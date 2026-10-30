@@ -1,0 +1,10 @@
+[Unit]
+Description=Respaldo de IDtech Command (base de datos y fotos)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/idcmd-respaldar
+Nice=10
+IOSchedulingClass=idle

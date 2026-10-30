@@ -1,0 +1,10 @@
+[Unit]
+Description=Respaldo de IDtech Command cada 6 horas
+
+[Timer]
+OnCalendar=*-*-* 00/6:17:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

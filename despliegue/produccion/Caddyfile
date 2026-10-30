@@ -1,0 +1,21 @@
+# Publica la central con HTTPS. Caddy obtiene y renueva solo el certificado de Let's Encrypt
+# (necesita el puerto 80 abierto y el registro DNS apuntando al servidor) y redirige http -> https.
+{$IDCMD_DOMINIO} {
+	# Correo para los avisos de Let's Encrypt. En pruebas, IDCMD_ACME_CORREO=internal usa una CA
+	# local en lugar de Let's Encrypt.
+	tls {$IDCMD_ACME_CORREO}
+
+	encode zstd gzip
+
+	# Las fotos llegan reducidas (<= 8 MB, almacen.MAX_BYTES); el resto se rechaza aquí.
+	request_body {
+		max_size 10MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	reverse_proxy central:8000
+}

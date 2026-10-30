@@ -1,0 +1,100 @@
+# Central de IDtech Command en producción: un servidor Ubuntu con Docker (Oracle Cloud Bogotá o
+# cualquier VPS en Colombia). Caddy publica el portal y la ingesta con HTTPS (Let's Encrypt);
+# Postgres, la central y el worker no publican ningún puerto.
+#
+# No se usa a mano: lo maneja instalar.sh, con los secretos en /srv/idcmd/produccion.env
+# (fuera del código, permisos 600):
+#   docker compose --env-file /srv/idcmd/produccion.env -f despliegue/produccion/docker-compose.yml ...
+name: idcmd
+
+x-registro: &registro
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "5"}   # que los registros no llenen el disco
+
+x-endurecido: &endurecido
+  <<: *registro
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: [/tmp]
+  restart: unless-stopped
+
+x-central: &central
+  image: idcmd-central:prod
+  build: {context: ../.., dockerfile: central/Dockerfile}
+
+services:
+  bd:
+    <<: *registro
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${IDCMD_PG_CLAVE:?falta IDCMD_PG_CLAVE}
+    volumes: [bd:/var/lib/postgresql/data]
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 30
+    restart: unless-stopped
+
+  # Tareas de una vez (instalar.sh): migraciones y rol de servicio, usuarios, inventario.
+  preparar:
+    <<: [*registro, *central]
+    profiles: [herramientas]
+    command: ["idcmd-central", "preparar"]
+    environment:
+      IDCMD_DSN_ADMIN: postgresql://postgres:${IDCMD_PG_CLAVE}@bd:5432/postgres
+      IDCMD_CLAVE_SERVICIO: ${IDCMD_CLAVE_SERVICIO:?falta IDCMD_CLAVE_SERVICIO}
+      IDCMD_LLAVE_TOTP: ${IDCMD_LLAVE_TOTP:?falta IDCMD_LLAVE_TOTP}
+    volumes: ["/srv/idcmd/sitios:/sitios"]   # inventarios y config de agentes (sin claves)
+    depends_on: {bd: {condition: service_healthy}}
+
+  central:
+    <<: [*endurecido, *central]
+    # Detrás de Caddy: la IP real del visitante llega en X-Forwarded-For. Aceptarlo de cualquier
+    # origen es seguro porque este contenedor no publica puertos: solo Caddy le habla.
+    command: ["uvicorn", "idcmd_central.app:crear_app", "--factory", "--host", "0.0.0.0",
+              "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+    environment:
+      IDCMD_DSN: postgresql://idcmd_servicio:${IDCMD_CLAVE_SERVICIO}@bd:5432/postgres
+      IDCMD_LLAVE_TOTP: ${IDCMD_LLAVE_TOTP}
+      IDCMD_URL_PUBLICA: https://${IDCMD_DOMINIO:?falta IDCMD_DOMINIO}
+    volumes: [archivos:/datos/archivos]   # fotos y firmas de los servicios
+    depends_on: {bd: {condition: service_healthy}}
+
+  # Tickets, escalamiento, SLA y avisos.
+  worker:
+    <<: [*endurecido, *central]
+    command: ["idcmd-central", "worker"]
+    environment:
+      IDCMD_DSN: postgresql://idcmd_servicio:${IDCMD_CLAVE_SERVICIO}@bd:5432/postgres
+      IDCMD_LLAVE_TOTP: ${IDCMD_LLAVE_TOTP}
+      IDCMD_URL_PUBLICA: https://${IDCMD_DOMINIO}
+      IDCMD_SMTP_SERVIDOR: ${IDCMD_SMTP_SERVIDOR:-}
+      IDCMD_SMTP_PUERTO: ${IDCMD_SMTP_PUERTO:-587}
+      IDCMD_SMTP_USUARIO: ${IDCMD_SMTP_USUARIO:-}
+      IDCMD_SMTP_CLAVE: ${IDCMD_SMTP_CLAVE:-}
+      IDCMD_SMTP_REMITENTE: ${IDCMD_SMTP_REMITENTE:-}
+      IDCMD_TELEGRAM_TOKEN: ${IDCMD_TELEGRAM_TOKEN:-}
+    depends_on: {bd: {condition: service_healthy}}
+
+  caddy:
+    <<: *endurecido
+    image: caddy:2.11.7
+    cap_add: [NET_BIND_SERVICE]
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      IDCMD_DOMINIO: ${IDCMD_DOMINIO}
+      IDCMD_ACME_CORREO: ${IDCMD_ACME_CORREO:?falta IDCMD_ACME_CORREO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_datos:/data       # certificados: si se pierden, Let's Encrypt limita las reemisiones
+      - caddy_config:/config
+    depends_on: [central]
+
+volumes:
+  bd:
+  archivos:
+  caddy_datos:
+  caddy_config:
