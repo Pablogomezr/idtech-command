@@ -247,5 +247,12 @@ async def test_pwa(bd):
         assert manifiesto.json()["scope"] == "/portal/"
         sw = await c.get("/portal/sw.js")
         assert sw.status_code == 200 and "javascript" in sw.headers["content-type"]
+        # Tras una actualización no debe quedar la hoja de estilos vieja: la URL lleva la
+        # versión de los estáticos y el service worker va primero a la red y cambia de caché.
+        from idcmd_central.portal.rutas import VERSION_ESTATICOS
+
+        assert f"idcmd-{VERSION_ESTATICOS}" in sw.text and "__VERSION__" not in sw.text
+        ingreso = await c.get("/portal/entrar")
+        assert f"/portal/estaticos/portal.css?v={VERSION_ESTATICOS}" in ingreso.text
         assert (await c.get("/portal/estaticos/icono-512.png")).status_code == 200
         assert (await c.get("/portal/sin-conexion")).status_code == 200

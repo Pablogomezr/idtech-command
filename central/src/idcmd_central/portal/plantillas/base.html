@@ -9,9 +9,9 @@
   <link rel="icon" href="/portal/estaticos/icono-192.png">
   <link rel="apple-touch-icon" href="/portal/estaticos/icono-192.png">
   <link rel="preload" href="/portal/estaticos/fuentes/ibm-plex-sans.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/portal/estaticos/portal.css">
-  <script src="/portal/estaticos/htmx.min.js" defer></script>
-  <script src="/portal/estaticos/campo.js" defer></script>
+  <link rel="stylesheet" href="/portal/estaticos/portal.css?v={{ V }}">
+  <script src="/portal/estaticos/htmx.min.js?v={{ V }}" defer></script>
+  <script src="/portal/estaticos/campo.js?v={{ V }}" defer></script>
 </head>
 {% from "_iconos.html" import icono %}
 {% set ruta = request.url.path %}

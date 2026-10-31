@@ -7,6 +7,7 @@ Cada ingreso, salida y página vista queda en `auditoria_accesos`.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -33,6 +34,18 @@ COOKIE = "idcmd_sesion"
 DURACION_SESION = timedelta(hours=12)
 REFRESCO_S = 15
 
+
+def _version_estaticos() -> str:
+    """Huella de los archivos estáticos: va en sus URL (?v=) para que el navegador no use una
+    hoja de estilos vieja después de una actualización."""
+    h = hashlib.sha256()
+    for archivo in sorted((Path(__file__).parent / "estaticos").rglob("*")):
+        if archivo.is_file():
+            h.update(archivo.name.encode() + archivo.read_bytes())
+    return h.hexdigest()[:10]
+
+
+VERSION_ESTATICOS = _version_estaticos()
 plantillas = Jinja2Templates(directory=Path(__file__).parent / "plantillas")
 plantillas.env.globals.update(
     ESTADOS=presentacion.ESTADOS,
@@ -48,6 +61,7 @@ plantillas.env.globals.update(
     OPERACIONES=presentacion.OPERACIONES,
     CRITICAS=presentacion.CRITICAS,
     REFRESCO_S=REFRESCO_S,
+    V=VERSION_ESTATICOS,
 )
 plantillas.env.filters.update(
     hora_iso=lambda texto, formato="%d/%m %H:%M": presentacion.hora(

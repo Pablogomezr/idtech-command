@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Resp
 from ..servicio import almacen
 from ..servicio.reglas import firma_valida
 from . import consultas
-from .rutas import _a_ingreso, _ip, _mismo_origen, _pagina, _usuario_de_sesion
+from .rutas import VERSION_ESTATICOS, _a_ingreso, _ip, _mismo_origen, _pagina, _usuario_de_sesion
 
 router = APIRouter()
 ESTATICOS = Path(__file__).parent / "estaticos"
@@ -241,9 +241,10 @@ async def archivo_cliente(
 
 @router.get("/portal/sw.js", include_in_schema=False)
 async def service_worker():
-    # Servido desde /portal/ para que su alcance cubra todo el portal.
-    return FileResponse(
-        ESTATICOS / "sw.js",
+    # Servido desde /portal/ para que su alcance cubra todo el portal. Lleva la versión de los
+    # estáticos: si cambian, el navegador instala el nuevo y borra la caché vieja.
+    return Response(
+        (ESTATICOS / "sw.js").read_text(encoding="utf-8").replace("__VERSION__", VERSION_ESTATICOS),
         media_type="text/javascript",
         headers={"Cache-Control": "no-cache"},
     )
