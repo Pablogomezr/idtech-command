@@ -4,28 +4,32 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}IDtech Command{% endblock %}</title>
-  <meta name="theme-color" content="#0b5cad">
+  <meta name="theme-color" content="#060E26">
   <link rel="manifest" href="/portal/manifest.webmanifest">
   <link rel="icon" href="/portal/estaticos/icono-192.png">
   <link rel="apple-touch-icon" href="/portal/estaticos/icono-192.png">
+  <link rel="preload" href="/portal/estaticos/fuentes/ibm-plex-sans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/portal/estaticos/portal.css">
   <script src="/portal/estaticos/htmx.min.js" defer></script>
   <script src="/portal/estaticos/campo.js" defer></script>
 </head>
-<body>
+{% from "_iconos.html" import icono %}
+{% set ruta = request.url.path %}
+<body class="{{ 'con-menu' if usuario else 'sin-menu' }}">
 {% if usuario %}
-<header class="barra">
-  <a class="marca" href="/portal">IDtech Command</a>
+<aside class="menu">
+  <a class="menu-marca" href="/portal">{% include "_marca.html" %}<span class="producto">Command</span></a>
   <nav class="principal">
-    <a href="/portal">Sitios</a>
-    <a href="/portal/tickets">Tickets</a>
-    <a href="/portal/servicios">Servicios</a>
-    <a href="/portal/informes">Informes</a>
-    {% if usuario.rol == 'admin' %}<a href="/portal/avisos">Avisos</a>{% endif %}
+    {% for url, texto, nombre in [('/portal', 'Sitios', 'sitios'), ('/portal/tickets', 'Tickets', 'tickets'), ('/portal/servicios', 'Servicios', 'servicios'), ('/portal/informes', 'Informes', 'informes')] + ([('/portal/avisos', 'Avisos', 'avisos')] if usuario.rol == 'admin' else []) %}
+    {% set activa = (ruta == url) or (url != '/portal' and ruta.startswith(url)) or (url == '/portal' and ruta.startswith('/portal/sitios')) %}
+    <a href="{{ url }}" class="{{ 'activa' if activa }}">{{ icono(nombre) }}<span>{{ texto }}</span></a>
+    {% endfor %}
   </nav>
-  <span class="usuario">{{ usuario.nombre }} · {{ usuario.rol }}</span>
-  <form method="post" action="/portal/salir"><button class="discreto" type="submit">Salir</button></form>
-</header>
+  <div class="menu-usuario">
+    <div class="quien">{{ icono('usuario') }}<span><b>{{ usuario.nombre }}</b><small>{{ {'admin': 'Administrador', 'tecnico': 'Técnico', 'cliente': 'Cliente'}.get(usuario.rol, usuario.rol) }}</small></span></div>
+    <form method="post" action="/portal/salir"><button class="salir" type="submit" title="Salir">{{ icono('salir') }}<span>Salir</span></button></form>
+  </div>
+</aside>
 {% endif %}
 <main>{% block contenido %}{% endblock %}</main>
 </body>

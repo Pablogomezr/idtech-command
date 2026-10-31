@@ -1,19 +1,32 @@
 {% extends "base.html" %}
 {% block titulo %}Ingresar · IDtech Command{% endblock %}
 {% block contenido %}
-<div class="ingreso tarjeta">
-  <h1>IDtech Command</h1>
-  <div class="sub">Monitoreo de CCTV y control de acceso</div>
-  {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
-  <form method="post" action="/portal/entrar" autocomplete="on">
-    <label for="correo">Correo</label>
-    <input id="correo" name="correo" type="email" required autocomplete="username" autofocus>
-    <label for="clave">Clave</label>
-    <input id="clave" name="clave" type="password" required autocomplete="current-password">
-    <label for="codigo">Código de verificación (aplicación de autenticación)</label>
-    <input id="codigo" name="codigo" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7"
-           required autocomplete="one-time-code">
-    <button type="submit">Ingresar</button>
-  </form>
+<div class="ingreso-pantalla">
+  <section class="ingreso-marca">
+    {% include "_marca.html" %}
+    <div class="ingreso-producto">Command</div>
+    <p class="ingreso-lema">Monitoreo 24/7 de CCTV y control de acceso, servicio técnico y cumplimiento de SLA en un solo lugar.</p>
+    <ul class="ingreso-puntos">
+      <li>Detección de fallas en menos de 5 minutos</li>
+      <li>Tickets automáticos al técnico de la zona</li>
+      <li>Informe mensual de disponibilidad</li>
+    </ul>
+    <div class="ingreso-pie">Ingeniería y Desarrollo IDtech S.A.S. · Barranquilla</div>
+  </section>
+  <section class="ingreso">
+    <h1>Ingresar</h1>
+    <div class="sub">Use su correo, su clave y el código de su aplicación de autenticación.</div>
+    {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="/portal/entrar" autocomplete="on">
+      <label for="correo">Correo</label>
+      <input id="correo" name="correo" type="email" required autocomplete="username" autofocus>
+      <label for="clave">Clave</label>
+      <input id="clave" name="clave" type="password" required autocomplete="current-password">
+      <label for="codigo">Código de verificación</label>
+      <input id="codigo" name="codigo" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7"
+             required autocomplete="one-time-code" placeholder="6 dígitos">
+      <button type="submit">Ingresar</button>
+    </form>
+  </section>
 </div>
 {% endblock %}

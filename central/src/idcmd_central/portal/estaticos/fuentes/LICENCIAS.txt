@@ -1,0 +1,2 @@
+Archivo (Omnibus-Type) e IBM Plex Sans (IBM): SIL Open Font License 1.1.
+Copias locales (subconjunto latino) para no cargar nada de terceros desde el portal.

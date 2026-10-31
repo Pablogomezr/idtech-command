@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import functools
 import re
 import uuid
 from datetime import UTC, date, datetime
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
@@ -44,9 +47,22 @@ async def resumen(con, sitio_id: uuid.UUID, periodo: date, ahora: datetime) -> d
     return await inf.construir(con, sitio_id, periodo, ahora)
 
 
+@functools.cache
+def _logo() -> dict[str, str]:
+    """Logo dentro del HTML (data URI): el PDF y el enlace del cliente no cargan nada aparte."""
+    carpeta = Path(__file__).parent / "estaticos" / "marca"
+    return {
+        nombre: "data:image/png;base64,"
+        + base64.b64encode((carpeta / f"idtech-{nombre}.png").read_bytes()).decode()
+        for nombre in ("simbolo", "letras")
+    }
+
+
 def _html(r: dict, barra: list[tuple[str, str, str]] | None = None) -> str:
     plantilla = plantillas.env.get_template("informe.html")
-    return plantilla.render(r=r, barra=barra, grafico=tendencia_svg(r["tendencia"], r["meta"]))
+    return plantilla.render(
+        r=r, barra=barra, grafico=tendencia_svg(r["tendencia"], r["meta"]), logo=_logo()
+    )
 
 
 def _nombre_archivo(r: dict) -> str:

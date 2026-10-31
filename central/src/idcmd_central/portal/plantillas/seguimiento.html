@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Servicio #{{ t.numero }} · IDtech</title>
+  <link rel="icon" href="/portal/estaticos/icono-192.png">
   <link rel="stylesheet" href="/portal/estaticos/portal.css">
 </head>
 <body>
-<header class="barra"><span class="marca">IDtech · Seguimiento de servicio</span></header>
+<header class="barra-publica">{% include "_marca.html" %}<span class="titulo-publico">Seguimiento de servicio</span></header>
 <main>
   <h1>Servicio #{{ t.numero }}</h1>
   <div class="sub">{{ t.sitio }}{% if t.equipo %} · {{ t.equipo }}{% endif %}</div>

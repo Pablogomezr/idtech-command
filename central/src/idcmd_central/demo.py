@@ -205,7 +205,7 @@ def _ticket(con, azar, disp, nombre, tipo, criticidad, tecnico_id, inicio, fin) 
     corta = fin - inicio < timedelta(minutes=30)
     asignado = inicio + timedelta(minutes=1)
     aceptado = None if corta else inicio + timedelta(minutes=azar.choice([8, 15, 25, 40, 70]))
-    if aceptado and azar.random() < 0.2:  # algunos fuera de plazo: el reporte debe mostrarlos
+    if aceptado and azar.random() < 0.08:  # algunos fuera de plazo: el reporte debe mostrarlos
         aceptado = inicio + timedelta(minutes=sla["respuesta_min"] + azar.choice([20, 45, 90]))
     en_sitio = None if corta else aceptado + timedelta(minutes=azar.choice([35, 50, 80]))
     resuelto = None if corta else max(fin, en_sitio + timedelta(minutes=10))

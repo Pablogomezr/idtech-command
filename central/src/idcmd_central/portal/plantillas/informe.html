@@ -11,7 +11,7 @@
   @page { size: A4; margin: 16mm 14mm 18mm;
     @bottom-left { content: "IDtech Command · Ingeniería y Desarrollo IDtech SAS"; font: 8pt sans-serif; color: #8a93a3; }
     @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 8pt sans-serif; color: #8a93a3; } }
-  :root { --marca: #0b5cad; --texto: #1d2330; --suave: #5d6677; --borde: #dde1e8; --fondo: #f5f6f8;
+  :root { --marca: #0f4c8f; --texto: #1d2330; --suave: #5d6677; --borde: #dde1e8; --fondo: #f5f6f8;
     --ok: #1f7a3f; --ok-f: #e3f3e8; --mal: #b42318; --mal-f: #fde7e5; --deg: #8a5a00; --deg-f: #fff3d6; }
   * { box-sizing: border-box; }
   html { background: #e9ecf1; }
@@ -24,7 +24,8 @@
   header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
     border-bottom: 3px solid var(--marca); padding-bottom: 10px; margin-bottom: 16px; }
   .marca { font-weight: 800; font-size: 15pt; color: var(--marca); letter-spacing: .3px; }
-  .marca small { display: block; font-weight: 400; font-size: 8.5pt; color: var(--suave); letter-spacing: 0; }
+  .marca .logo { display: flex; align-items: center; gap: 7px; } .marca .ls { height: 34px; } .marca .ll { height: 17px; }
+  .marca small { display: block; margin-top: 4px; font-weight: 400; font-size: 8.5pt; color: var(--suave); letter-spacing: 0; }
   .titulo { text-align: right; }
   .titulo h1 { margin: 0; font-size: 15pt; }
   .titulo div { color: var(--suave); font-size: 9.5pt; }
@@ -58,7 +59,8 @@
 {% if barra %}<nav class="solo-pantalla">{% for texto, url, clase in barra %}<a class="{{ clase }}" href="{{ url }}">{{ texto }}</a>{% endfor %}</nav>{% endif %}
 
 <header>
-  <div class="marca">IDtech<small>Ingeniería y Desarrollo IDtech SAS</small></div>
+  <div class="marca"><span class="logo"><img src="{{ logo.simbolo }}" alt="" class="ls"><img src="{{ logo.letras }}" alt="IDtech" class="ll"></span>
+    <small>Ingeniería y Desarrollo IDtech S.A.S.</small></div>
   <div class="titulo">
     <h1>Informe de servicio · {{ r.periodo_texto|capitalize }}</h1>
     <div>{{ r.cliente }}{% if r.regional %} · {{ r.regional }}{% endif %} · <strong>{{ r.sitio }}</strong>{% if r.ciudad %} ({{ r.ciudad }}){% endif %}</div>
