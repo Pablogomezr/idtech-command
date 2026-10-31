@@ -57,6 +57,8 @@ plantillas.env.filters.update(
     codigo=presentacion.nombre_codigo,
     legible=presentacion.legible,
     valor=presentacion.valor,
+    pct=presentacion.pct,
+    num=presentacion.num,
 )
 
 router = APIRouter()

@@ -1,0 +1,204 @@
+<!doctype html>
+{#- Informe mensual de SLA. Documento completo e independiente: el mismo HTML se ve en el portal,
+    en el enlace del cliente y se convierte en PDF (sin recursos externos). Variables: r (resumen),
+    barra (enlaces de la parte superior, solo en pantalla) y grafico (SVG de tendencia). -#}
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informe de servicio · {{ r.sitio }} · {{ r.periodo_texto }}</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm 18mm;
+    @bottom-left { content: "IDtech Command · Ingeniería y Desarrollo IDtech SAS"; font: 8pt sans-serif; color: #8a93a3; }
+    @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 8pt sans-serif; color: #8a93a3; } }
+  :root { --marca: #0b5cad; --texto: #1d2330; --suave: #5d6677; --borde: #dde1e8; --fondo: #f5f6f8;
+    --ok: #1f7a3f; --ok-f: #e3f3e8; --mal: #b42318; --mal-f: #fde7e5; --deg: #8a5a00; --deg-f: #fff3d6; }
+  * { box-sizing: border-box; }
+  html { background: #e9ecf1; }
+  body { margin: 0 auto; max-width: 820px; background: #fff; color: var(--texto);
+    font: 10.5pt/1.45 "DejaVu Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 28px 30px; }
+  @media print { html { background: #fff; } body { max-width: none; padding: 0; } .solo-pantalla { display: none; } }
+  .solo-pantalla { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 14px; }
+  .solo-pantalla a { background: var(--marca); color: #fff; padding: 7px 14px; border-radius: 8px; text-decoration: none; font-size: 13px; }
+  .solo-pantalla a.sec { background: #fff; color: var(--marca); border: 1px solid var(--borde); }
+  header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
+    border-bottom: 3px solid var(--marca); padding-bottom: 10px; margin-bottom: 16px; }
+  .marca { font-weight: 800; font-size: 15pt; color: var(--marca); letter-spacing: .3px; }
+  .marca small { display: block; font-weight: 400; font-size: 8.5pt; color: var(--suave); letter-spacing: 0; }
+  .titulo { text-align: right; }
+  .titulo h1 { margin: 0; font-size: 15pt; }
+  .titulo div { color: var(--suave); font-size: 9.5pt; }
+  .aviso { background: var(--deg-f); color: var(--deg); border-radius: 8px; padding: 7px 10px; font-size: 9.5pt; margin-bottom: 12px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+  .kpi { border: 1px solid var(--borde); border-radius: 10px; padding: 9px 10px; }
+  .kpi .v { font-size: 17pt; font-weight: 800; line-height: 1.15; }
+  .kpi .e { color: var(--suave); font-size: 8.5pt; text-transform: uppercase; letter-spacing: .4px; }
+  .kpi .d { color: var(--suave); font-size: 8.5pt; }
+  .kpi.bien { border-color: #b9dfc6; background: var(--ok-f); } .kpi.bien .v { color: var(--ok); }
+  .kpi.mal { border-color: #f3c3be; background: var(--mal-f); } .kpi.mal .v { color: var(--mal); }
+  h2 { break-after: avoid; font-size: 11.5pt; margin: 18px 0 6px; color: var(--marca); border-bottom: 1px solid var(--borde); padding-bottom: 3px; }
+  p.nota, .nota { color: var(--suave); font-size: 8.5pt; margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 9pt; page-break-inside: auto; }
+  th { text-align: left; font-weight: 600; color: var(--suave); border-bottom: 1px solid var(--borde); padding: 4px 6px; }
+  td { border-bottom: 1px solid #eef0f4; padding: 4px 6px; vertical-align: top; }
+  tr { page-break-inside: avoid; }
+  td.n, th.n { text-align: right; white-space: nowrap; }
+  .p { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 8pt; font-weight: 600; white-space: nowrap; }
+  .p.bien { background: var(--ok-f); color: var(--ok); } .p.mal { background: var(--mal-f); color: var(--mal); }
+  .p.deg { background: var(--deg-f); color: var(--deg); } .p.nd { background: var(--fondo); color: var(--suave); }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grafico { display: block; margin: 4px 0 2px; }
+  footer { break-before: avoid; margin-top: 14px; border-top: 1px solid var(--borde); padding-top: 8px; color: var(--suave); font-size: 8pt; }
+  @media (max-width: 640px) { body { padding: 16px; } .kpis { grid-template-columns: 1fr 1fr; } .dos { grid-template-columns: 1fr; }
+    header { flex-direction: column; align-items: flex-start; } .titulo { text-align: left; }
+    table { display: block; overflow-x: auto; white-space: nowrap; } td .nota { white-space: normal; } .opc { display: none; } }
+</style>
+</head>
+<body>
+{% if barra %}<nav class="solo-pantalla">{% for texto, url, clase in barra %}<a class="{{ clase }}" href="{{ url }}">{{ texto }}</a>{% endfor %}</nav>{% endif %}
+
+<header>
+  <div class="marca">IDtech<small>Ingeniería y Desarrollo IDtech SAS</small></div>
+  <div class="titulo">
+    <h1>Informe de servicio · {{ r.periodo_texto|capitalize }}</h1>
+    <div>{{ r.cliente }}{% if r.regional %} · {{ r.regional }}{% endif %} · <strong>{{ r.sitio }}</strong>{% if r.ciudad %} ({{ r.ciudad }}){% endif %}</div>
+    <div>Del {{ r.desde|hora_iso("%d/%m/%Y") }} al {{ r.hasta|hora_iso("%d/%m/%Y %H:%M") }} (hora de Colombia) · generado el {{ r.generado_at|hora_iso("%d/%m/%Y %H:%M") }}</div>
+  </div>
+</header>
+
+{% if r.parcial %}<div class="aviso">Informe parcial: datos hasta el {{ r.hasta|hora_iso("%d/%m/%Y %H:%M") }}. El informe definitivo se emite al cerrar el mes.</div>{% endif %}
+
+{% set disp = r.disponibilidad %}
+<section class="kpis">
+  <div class="kpi {{ 'bien' if r.cumple_meta else ('mal' if r.cumple_meta == false else '') }}">
+    <div class="e">Disponibilidad</div>
+    <div class="v">{{ disp|pct if disp is not none else "—" }}</div>
+    <div class="d">Meta del contrato {{ r.meta|pct }}</div>
+  </div>
+  <div class="kpi">
+    <div class="e">Caídas</div>
+    <div class="v">{{ r.totales.caidas }}</div>
+    <div class="d">{{ duracion(r.totales.caido_s) if r.totales.caido_s else "sin tiempo caído" }}</div>
+  </div>
+  <div class="kpi">
+    <div class="e">Servicios (tickets)</div>
+    <div class="v">{{ r.tickets.total }}</div>
+    <div class="d">Solución a tiempo: {{ r.tickets.solucion_pct|pct(0) if r.tickets.solucion_pct is not none else "—" }}</div>
+  </div>
+  <div class="kpi">
+    <div class="e">Tiempo medio de solución</div>
+    <div class="v">{{ duracion(r.tickets.mttr_s) if r.tickets.mttr_s else "—" }}</div>
+    <div class="d">Respuesta media: {{ duracion(r.tickets.respuesta_prom_s) if r.tickets.respuesta_prom_s else "—" }}</div>
+  </div>
+</section>
+
+<h2>Disponibilidad de los últimos meses</h2>
+{{ grafico }}
+<p class="nota">Disponibilidad del sitio = tiempo en servicio ÷ (tiempo en servicio + tiempo caído), promedio de los equipos ponderado por criticidad.
+  {% if r.totales.sin_datos_s %}Hubo {{ duracion(r.totales.sin_datos_s) }} sin datos (equipo o conexión del sitio sin reportar): se informa aparte y no se cuenta como caída.{% endif %}
+  {% if r.totales.excluido_s %}Se excluyeron {{ duracion(r.totales.excluido_s) }} por mantenimiento o causas del cliente (detalle al final).{% endif %}</p>
+
+<h2>Disponibilidad por equipo</h2>
+<table>
+  <thead><tr><th>Equipo</th><th class="opc">Tipo</th><th class="n">Disponibilidad</th><th class="n">Caídas</th><th class="n">Tiempo caído</th><th class="n">Con novedad</th><th class="n">Sin datos</th></tr></thead>
+  <tbody>
+  {% for e in r.equipos %}
+    <tr>
+      <td>{{ e.nombre }}{% if e.criticidad == 1 %} <span class="p deg">crítico</span>{% endif %}</td>
+      <td class="opc">{{ TIPOS_EQUIPO.get(e.tipo, e.tipo) }}</td>
+      {% if e.medido %}
+        <td class="n">{% if e.disponibilidad is none %}<span class="p nd">sin medición</span>{% else %}<span class="p {{ 'bien' if e.disponibilidad >= r.meta else 'mal' }}">{{ e.disponibilidad|pct }}</span>{% endif %}</td>
+        <td class="n">{{ e.caidas }}</td>
+        <td class="n">{{ duracion(e.caido_s) if e.caido_s else "—" }}</td>
+        <td class="n">{{ duracion(e.degradado_s) if e.degradado_s else "—" }}</td>
+        <td class="n">{{ duracion(e.sin_datos_s) if e.sin_datos_s else "—" }}</td>
+      {% else %}
+        <td class="n" colspan="5"><span class="p nd">sin monitoreo en el periodo</span></td>
+      {% endif %}
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="nota">El sitio no tiene equipos registrados.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="nota">"Con novedad": el equipo prestó servicio con una advertencia (p. ej. retención por debajo de lo contratado); cuenta como disponible.</p>
+
+{% if r.caidas %}
+<h2>Caídas más largas</h2>
+<table>
+  <thead><tr><th>Equipo</th><th>Inicio</th><th>Fin</th><th class="n">Duración</th></tr></thead>
+  <tbody>{% for c in r.caidas %}
+    <tr><td>{{ c.equipo }}</td><td>{{ c.inicio|hora_iso("%d/%m %H:%M") }}</td>
+      <td>{{ "en curso" if c.en_curso else c.fin|hora_iso("%d/%m %H:%M") }}</td><td class="n">{{ duracion(c.duracion_s) }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+{% endif %}
+
+<h2>Servicios y cumplimiento de SLA</h2>
+{% if r.tickets.total %}
+<div class="dos">
+  <table>
+    <thead><tr><th>Prioridad</th><th class="n">Tickets</th><th class="n">Respuesta a tiempo</th><th class="n">Solución a tiempo</th></tr></thead>
+    <tbody>{% for p in r.tickets.por_prioridad %}
+      <tr><td>{{ PRIORIDADES[p.prioridad] }}</td><td class="n">{{ p.total }}</td>
+        <td class="n">{{ p.respuesta_pct|pct(0) if p.respuesta_pct is not none else "—" }}</td>
+        <td class="n">{{ p.solucion_pct|pct(0) if p.solucion_pct is not none else "—" }}</td></tr>
+    {% endfor %}
+      <tr><td><strong>Total</strong></td><td class="n"><strong>{{ r.tickets.total }}</strong></td>
+        <td class="n"><strong>{{ r.tickets.respuesta_pct|pct(0) if r.tickets.respuesta_pct is not none else "—" }}</strong></td>
+        <td class="n"><strong>{{ r.tickets.solucion_pct|pct(0) if r.tickets.solucion_pct is not none else "—" }}</strong></td></tr>
+    </tbody>
+  </table>
+  <div>
+    {% if r.fallas_top %}
+    <table>
+      <thead><tr><th>Fallas más frecuentes</th><th class="n">Veces</th></tr></thead>
+      <tbody>{% for f in r.fallas_top %}<tr><td>{{ f.nombre }}</td><td class="n">{{ f.veces }}</td></tr>{% endfor %}</tbody>
+    </table>
+    {% endif %}
+  </div>
+</div>
+<table style="margin-top:10px">
+  <thead><tr><th>#</th><th>Servicio</th><th>Abierto</th><th>Prioridad</th><th>Estado</th><th class="n">Respuesta</th><th class="n">Solución</th></tr></thead>
+  <tbody>{% for t in r.tickets.lista %}
+    <tr><td>{{ t.numero }}</td><td>{{ t.titulo }}{% if t.equipo %}<div class="nota">{{ t.equipo }}</div>{% endif %}</td>
+      <td>{{ t.abierto_at|hora_iso("%d/%m %H:%M") }}</td><td>{{ PRIORIDADES[t.prioridad] }}</td>
+      <td>{{ CIERRES.get(t.cierre) if t.cierre else ESTADOS_TICKET.get(t.estado, t.estado) }}</td>
+      {% for ok in (t.respuesta_ok, t.solucion_ok) %}
+      <td class="n">{% if ok is none %}<span class="p nd">{{ "no aplica" if t.cierre in ("cancelado", "recuperado_solo") else "en curso" }}</span>{% elif ok %}<span class="p bien">a tiempo</span>{% else %}<span class="p mal">fuera de plazo</span>{% endif %}</td>
+      {% endfor %}</tr>
+  {% endfor %}</tbody>
+</table>
+<p class="nota">Respuesta: desde que se detecta la falla hasta que el técnico acepta el servicio. Solución: hasta que el equipo queda verificado en línea. Los servicios cancelados o que se recuperaron sin intervención no se evalúan.</p>
+{% else %}
+<p class="nota">No hubo servicios en el periodo.</p>
+{% endif %}
+
+{% if r.retencion %}
+<h2>Retención de video</h2>
+<table>
+  <thead><tr><th>Cámara</th><th class="n">Real (días)</th><th class="n">Proyectada (días)</th><th class="n">Contratada (días)</th><th class="n">Estado</th></tr></thead>
+  <tbody>{% for x in r.retencion %}
+    <tr><td>{{ x.equipo }}</td><td class="n">{{ x.real|num }}</td><td class="n">{{ x.proyectada|num }}</td><td class="n">{{ x.contratada if x.contratada else "—" }}</td>
+      <td class="n">{% if x.cumple is none %}<span class="p nd">sin contrato</span>{% elif x.cumple %}<span class="p bien">cumple</span>{% else %}<span class="p mal">por debajo</span>{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table>
+<p class="nota">Medida al generar el informe. Proyectada: los días que alcanzará el disco cuando se llene, al ritmo actual de grabación.</p>
+{% endif %}
+
+{% if r.exclusiones %}
+<h2>Tiempo excluido del cálculo</h2>
+<table>
+  <thead><tr><th>Motivo</th><th>Equipo</th><th>Desde</th><th>Hasta</th><th>Descripción</th></tr></thead>
+  <tbody>{% for x in r.exclusiones %}
+    <tr><td>{{ "Mantenimiento" if x.motivo == "mantenimiento" else "Causa del cliente" }}</td><td>{{ x.equipo or "Todo el sitio" }}</td>
+      <td>{{ x.desde|hora_iso("%d/%m %H:%M") }}</td><td>{{ x.hasta|hora_iso("%d/%m %H:%M") }}</td><td>{{ x.descripcion }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+{% endif %}
+
+<footer>
+  Monitoreo 24/7 por IDtech Command: los equipos se consultan cada minuto desde el sitio; una caída se confirma con 3 chequeos seguidos y su hora es la del primero.
+</footer>
+</body>
+</html>

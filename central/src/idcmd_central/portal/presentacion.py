@@ -175,6 +175,17 @@ ACCIONES_TICKET = {
 }  # fmt: skip
 
 
+def pct(v: float | None, decimales: int = 2) -> str:
+    """99.5234 -> '99,52 %' (formato colombiano)."""
+    if v is None:
+        return "—"
+    return f"{v:.{decimales}f}".replace(".", ",") + " %"
+
+
+def num(v: float | None) -> str:
+    return "—" if v is None else f"{v:.1f}".replace(".", ",")
+
+
 def duracion(segundos: float) -> str:
     s = int(abs(segundos))
     if s < 3600:

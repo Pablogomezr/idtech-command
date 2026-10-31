@@ -10,6 +10,12 @@ idcmd-central inventario cargar --inventario sitio.yaml --salida /agente --url-c
 idcmd-central laboratorio preparar --inventario oficina.yaml --salida /lab
 idcmd-central usuarios telegram --correo a@b.co --chat-id 123456789
 idcmd-central worker                          # tickets, escalamiento, SLA y avisos
+idcmd-central sitios                          # sitios con su id
+idcmd-central exclusiones crear --sitio "Oficina" --motivo mantenimiento \
+    --desde "2026-11-09 08:00" --hasta "2026-11-09 11:00" --descripcion "Cambio de UPS"
+idcmd-central clientes sla --cliente "IDtech" --meta 99.5 --pdf-adjunto si
+idcmd-central informe emitir --mes 2026-10 [--sitio "Oficina"] [--recalcular]
+idcmd-central informe pdf --sitio "Oficina" --mes 2026-10 --salida informe.pdf
 """
 
 from __future__ import annotations
@@ -270,6 +276,167 @@ def cmd_laboratorio_preparar(args) -> int:
     return cmd_inventario_cargar(args)
 
 
+# --- Informes de SLA -------------------------------------------------------------------------
+
+
+def _sitio(con, texto: str) -> tuple[uuid.UUID, str]:
+    """Sitio por id o por nombre exacto (sin distinguir mayúsculas)."""
+    try:
+        fila = con.execute(
+            "SELECT id, nombre FROM idcmd.sitios WHERE id = %s", (uuid.UUID(texto),)
+        ).fetchone()
+    except ValueError:
+        filas = con.execute(
+            "SELECT id, nombre FROM idcmd.sitios WHERE lower(nombre) = lower(%s)", (texto,)
+        ).fetchall()
+        if len(filas) > 1:
+            sys.exit(
+                f"hay {len(filas)} sitios llamados '{texto}': use el id (idcmd-central sitios)"
+            )
+        fila = filas[0] if filas else None
+    if fila is None:
+        sys.exit(f"no existe el sitio '{texto}' (idcmd-central sitios)")
+    return fila[0], fila[1]
+
+
+def _hora_local(texto: str):
+    from datetime import datetime
+
+    from .portal.presentacion import ZONA
+
+    try:
+        return datetime.strptime(texto, "%Y-%m-%d %H:%M").replace(tzinfo=ZONA)
+    except ValueError:
+        sys.exit(f"fecha no válida '{texto}': use AAAA-MM-DD HH:MM (hora de Colombia)")
+
+
+def cmd_sitios(args) -> int:
+    with psycopg.connect(_dsn_admin()) as con:
+        for sitio_id, nombre, cliente in con.execute(
+            "SELECT s.id, s.nombre, c.nombre FROM idcmd.sitios s"
+            " JOIN idcmd.clientes c ON c.id = s.cliente_id ORDER BY c.nombre, s.nombre"
+        ):
+            print(f"{sitio_id}  {nombre}  ({cliente})")
+    return 0
+
+
+def cmd_exclusiones_crear(args) -> int:
+    desde, hasta = _hora_local(args.desde), _hora_local(args.hasta)
+    if hasta <= desde:
+        sys.exit("--hasta debe ser posterior a --desde")
+    with psycopg.connect(_dsn_admin()) as con:
+        sitio_id, nombre = _sitio(con, args.sitio)
+        equipo = None
+        if args.equipo:
+            fila = con.execute(
+                "SELECT id FROM idcmd.dispositivos WHERE sitio_id = %s"
+                " AND (id::text = %s OR lower(nombre) = lower(%s))",
+                (sitio_id, args.equipo, args.equipo),
+            ).fetchone()
+            if fila is None:
+                sys.exit(f"no existe el equipo '{args.equipo}' en {nombre}")
+            equipo = fila[0]
+        con.execute(
+            "INSERT INTO idcmd.exclusiones_sla (cliente_id, sitio_id, dispositivo_id, motivo,"
+            " desde, hasta, descripcion) SELECT cliente_id, id, %s, %s, %s, %s, %s"
+            " FROM idcmd.sitios WHERE id = %s",
+            (equipo, args.motivo, desde, hasta, args.descripcion, sitio_id),
+        )
+    print(f"exclusión registrada en {nombre}: {args.desde} a {args.hasta} ({args.motivo})")
+    print("Si el informe de ese mes ya se emitió: idcmd-central informe emitir --recalcular")
+    return 0
+
+
+def cmd_exclusiones_listar(args) -> int:
+    from .portal.presentacion import hora
+
+    with psycopg.connect(_dsn_admin()) as con:
+        sitio_id, _ = _sitio(con, args.sitio)
+        for motivo, desde, hasta, desc, equipo in con.execute(
+            "SELECT e.motivo, e.desde, e.hasta, e.descripcion, d.nombre"
+            " FROM idcmd.exclusiones_sla e LEFT JOIN idcmd.dispositivos d"
+            " ON d.id = e.dispositivo_id WHERE e.sitio_id = %s ORDER BY e.desde",
+            (sitio_id,),
+        ):
+            print(
+                f"{hora(desde)} -> {hora(hasta)}  {motivo:13}  {equipo or 'todo el sitio'}: {desc}"
+            )
+    return 0
+
+
+def cmd_clientes_sla(args) -> int:
+    with psycopg.connect(_dsn_admin()) as con:
+        n = con.execute(
+            "UPDATE idcmd.clientes SET meta_disponibilidad = coalesce(%s, meta_disponibilidad),"
+            " informe_pdf_adjunto = coalesce(%s, informe_pdf_adjunto)"
+            " WHERE id::text = %s OR lower(nombre) = lower(%s)",
+            (args.meta, None if args.pdf_adjunto is None else args.pdf_adjunto == "si",
+             args.cliente, args.cliente),
+        ).rowcount  # fmt: skip
+    if n != 1:
+        sys.exit(f"'{args.cliente}' coincide con {n} clientes: use el nombre exacto o el id")
+    print("SLA del cliente actualizado")
+    return 0
+
+
+def _informe(args, accion) -> int:
+    import asyncio
+    from datetime import UTC, datetime
+
+    from .informes import informe as inf
+
+    try:
+        periodo = inf.periodo_de(args.mes)
+    except ValueError:
+        sys.exit("--mes debe ser AAAA-MM, p. ej. 2026-10")
+
+    async def principal():
+        async with await psycopg.AsyncConnection.connect(_dsn_admin(), autocommit=True) as con:
+            return await accion(con, periodo, datetime.now(UTC))
+
+    return asyncio.run(principal())
+
+
+def cmd_informe_emitir(args) -> int:
+    from .informes import informe as inf
+    from .informes.emitir import guardar
+
+    async def accion(con, periodo, ahora):
+        if not inf.mes_cerrado(periodo, ahora):
+            sys.exit("ese mes no ha terminado: el informe se emite al cerrarlo")
+        with psycopg.connect(_dsn_admin()) as sinc:
+            sitios = [_sitio(sinc, args.sitio)] if args.sitio else sinc.execute(
+                "SELECT id, nombre FROM idcmd.sitios ORDER BY nombre").fetchall()  # fmt: skip
+        for sitio_id, nombre in sitios:
+            async with con.transaction():
+                r = await guardar(con, sitio_id, periodo, ahora, recalcular=args.recalcular)
+            disp = (
+                "—" if r is None or r["disponibilidad"] is None else f"{r['disponibilidad']:.3f} %"
+            )
+            print(f"{nombre}: {disp}")
+        if not args.recalcular:
+            print("(los ya emitidos no se tocan; para recalcularlos: --recalcular)")
+        return 0
+
+    return _informe(args, accion)
+
+
+def cmd_informe_pdf(args) -> int:
+    from .informes import informe as inf
+    from .informes.pdf import a_pdf
+    from .portal.informes import _html
+
+    async def accion(con, periodo, ahora):
+        with psycopg.connect(_dsn_admin()) as sinc:
+            sitio_id, _ = _sitio(sinc, args.sitio)
+        r = await inf.construir(con, sitio_id, periodo, ahora)
+        args.salida.write_bytes(a_pdf(_html(r)))
+        print(f"informe guardado en {args.salida}")
+        return 0
+
+    return _informe(args, accion)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="idcmd-central")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -309,6 +476,40 @@ def main(argv: list[str] | None = None) -> int:
     cargar.add_argument("--salida", type=Path, required=True)
     cargar.add_argument("--url-central", required=True, help="p. ej. https://command.idtech.com.co")
     cargar.set_defaults(fn=cmd_inventario_cargar)
+    sub.add_parser("sitios", help="sitios con su id").set_defaults(fn=cmd_sitios)
+    excl = sub.add_parser("exclusiones", help="tiempo que no cuenta en el SLA").add_subparsers(
+        dest="accion", required=True
+    )
+    e_crear = excl.add_parser("crear")
+    e_crear.add_argument("--sitio", required=True, help="nombre o id del sitio")
+    e_crear.add_argument("--equipo", help="nombre o id del equipo (sin esto: todo el sitio)")
+    e_crear.add_argument("--motivo", choices=["mantenimiento", "causa_cliente"], required=True)
+    e_crear.add_argument("--desde", required=True, help="AAAA-MM-DD HH:MM, hora de Colombia")
+    e_crear.add_argument("--hasta", required=True, help="AAAA-MM-DD HH:MM, hora de Colombia")
+    e_crear.add_argument("--descripcion", required=True)
+    e_crear.set_defaults(fn=cmd_exclusiones_crear)
+    e_listar = excl.add_parser("listar")
+    e_listar.add_argument("--sitio", required=True)
+    e_listar.set_defaults(fn=cmd_exclusiones_listar)
+    clientes = sub.add_parser("clientes").add_subparsers(dest="accion", required=True)
+    c_sla = clientes.add_parser("sla", help="meta de disponibilidad y PDF adjunto del informe")
+    c_sla.add_argument("--cliente", required=True)
+    c_sla.add_argument("--meta", type=float, help="p. ej. 99.5")
+    c_sla.add_argument("--pdf-adjunto", choices=["si", "no"])
+    c_sla.set_defaults(fn=cmd_clientes_sla)
+    informe = sub.add_parser("informe", help="informe mensual de SLA").add_subparsers(
+        dest="accion", required=True
+    )
+    i_emitir = informe.add_parser("emitir", help="emitir (o recalcular) el informe de un mes")
+    i_emitir.add_argument("--mes", required=True, help="AAAA-MM")
+    i_emitir.add_argument("--sitio", help="nombre o id (sin esto: todos)")
+    i_emitir.add_argument("--recalcular", action="store_true")
+    i_emitir.set_defaults(fn=cmd_informe_emitir)
+    i_pdf = informe.add_parser("pdf", help="guardar el informe en PDF")
+    i_pdf.add_argument("--sitio", required=True)
+    i_pdf.add_argument("--mes", required=True)
+    i_pdf.add_argument("--salida", type=Path, required=True)
+    i_pdf.set_defaults(fn=cmd_informe_pdf)
     lab = sub.add_parser("laboratorio").add_subparsers(dest="accion", required=True)
     preparar = lab.add_parser("preparar")
     preparar.add_argument("--inventario", type=Path, required=True)

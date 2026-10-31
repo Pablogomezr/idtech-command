@@ -13,6 +13,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "cryptography>=42",
     "pyyaml>=6",
+    "weasyprint>=66",
 ]
 
 [project.scripts]

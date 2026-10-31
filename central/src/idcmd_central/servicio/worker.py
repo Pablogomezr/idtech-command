@@ -465,6 +465,8 @@ async def ciclo(bd: BaseDatos, ahora: datetime, enviar: bool = True) -> Resumen:
 async def ejecutar(bd: BaseDatos) -> None:  # pragma: no cover - bucle de producción
     from datetime import UTC
 
+    from ..informes.emitir import emitir_mes
+
     while True:
         try:
             r = await ciclo(bd, datetime.now(UTC))
@@ -472,4 +474,9 @@ async def ejecutar(bd: BaseDatos) -> None:  # pragma: no cover - bucle de produc
                 log.info("servicio: %s", r)
         except Exception:
             log.exception("error en el ciclo del worker de servicio")
+        try:
+            if n := await emitir_mes(bd, datetime.now(UTC)):
+                log.info("informes mensuales emitidos: %s", n)
+        except Exception:
+            log.exception("error al emitir los informes mensuales")
         await asyncio.sleep(INTERVALO_S)

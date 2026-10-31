@@ -174,3 +174,5 @@ table.acta-datos th { width: 18%; }
   main { max-width: none; padding: 0; }
   .galeria img { width: 160px; height: 160px; }
 }
+.meses { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.meses a.mes { border: 1px solid var(--borde); border-radius: 8px; padding: 4px 9px; font-size: 13px; }

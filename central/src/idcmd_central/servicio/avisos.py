@@ -142,7 +142,9 @@ async def generar(con: AsyncConnection, ahora: datetime) -> int:
 # --- Envío -----------------------------------------------------------------------------------
 
 
-def _enviar_correo(destino: str, asunto: str, cuerpo: str) -> str:
+def _enviar_correo(
+    destino: str, asunto: str, cuerpo: str, adjunto: tuple[str, bytes] | None = None
+) -> str:
     servidor = os.environ.get("IDCMD_SMTP_SERVIDOR")
     if not servidor:
         return "sin_canal"
@@ -151,6 +153,8 @@ def _enviar_correo(destino: str, asunto: str, cuerpo: str) -> str:
     msg["To"] = destino
     msg["Subject"] = asunto
     msg.set_content(cuerpo)
+    if adjunto:
+        msg.add_attachment(adjunto[1], maintype="application", subtype="pdf", filename=adjunto[0])
     with smtplib.SMTP(servidor, int(os.environ.get("IDCMD_SMTP_PUERTO", "587")), timeout=20) as s:
         s.starttls(context=ssl.create_default_context())
         if usuario := os.environ.get("IDCMD_SMTP_USUARIO"):
@@ -159,7 +163,8 @@ def _enviar_correo(destino: str, asunto: str, cuerpo: str) -> str:
     return "enviada"
 
 
-def _enviar_telegram(chat_id: str, asunto: str, cuerpo: str) -> str:
+def _enviar_telegram(chat_id: str, asunto: str, cuerpo: str, adjunto=None) -> str:
+    # Telegram lleva solo el enlace (contenido mínimo); el PDF va únicamente por correo.
     token = os.environ.get("IDCMD_TELEGRAM_TOKEN")
     if not token:
         return "sin_canal"
@@ -178,10 +183,29 @@ def _enviar_telegram(chat_id: str, asunto: str, cuerpo: str) -> str:
 ENVIADORES = {"correo": _enviar_correo, "telegram": _enviar_telegram}
 
 
+async def _adjunto(bd: BaseDatos, referencia: str) -> tuple[str, bytes]:
+    """'informe:<sitio>:<aaaa-mm>' -> (nombre, PDF) generado desde el informe emitido."""
+    from datetime import date
+
+    from ..informes.pdf import a_pdf
+    from ..portal.informes import _html, _nombre_archivo
+
+    _, sitio, periodo = referencia.split(":")
+    async with bd.como_worker() as con:
+        cur = await con.execute(
+            "SELECT resumen FROM idcmd.informes_mensuales WHERE sitio_id = %s AND periodo = %s",
+            (sitio, date.fromisoformat(periodo + "-01")),
+        )
+        fila = await cur.fetchone()
+    if fila is None:
+        raise LookupError(f"no existe el informe {referencia}")
+    return _nombre_archivo(fila[0]), await asyncio.to_thread(a_pdf, _html(fila[0]))
+
+
 async def enviar_pendientes(bd: BaseDatos, ahora: datetime, lote: int = 50) -> int:
     async with bd.como_worker() as con:
         cur = await con.cursor(row_factory=dict_row).execute(
-            "SELECT id, canal, destino, asunto, cuerpo FROM idcmd.notificaciones"
+            "SELECT id, canal, destino, asunto, cuerpo, adjunto FROM idcmd.notificaciones"
             " WHERE enviada_at IS NULL AND intentos < %s ORDER BY id LIMIT %s",
             (MAX_INTENTOS, lote),
         )
@@ -189,8 +213,9 @@ async def enviar_pendientes(bd: BaseDatos, ahora: datetime, lote: int = 50) -> i
     enviadas = 0
     for n in pendientes:
         try:
+            adjunto = await _adjunto(bd, n["adjunto"]) if n["adjunto"] else None
             resultado = await asyncio.to_thread(
-                ENVIADORES[n["canal"]], n["destino"], n["asunto"], n["cuerpo"]
+                ENVIADORES[n["canal"]], n["destino"], n["asunto"], n["cuerpo"], adjunto
             )
             error = None
         except Exception as e:  # el aviso se reintenta; el ciclo no se detiene

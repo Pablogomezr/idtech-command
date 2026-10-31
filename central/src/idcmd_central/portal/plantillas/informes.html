@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titulo %}Informes · IDtech Command{% endblock %}
+{% block contenido %}
+<h1>Informes de servicio</h1>
+<div class="sub">Disponibilidad y cumplimiento de SLA por sitio y mes. El mes en curso es parcial;
+  al cerrar el mes se emite el informe definitivo y se envía a los contactos del sitio.</div>
+{% for s in sitios %}
+<div class="tarjeta">
+  <strong>{{ s.nombre }}</strong> <span class="sub">{{ s.cliente }}{% if s.ciudad %} · {{ s.ciudad }}{% endif %}</span>
+  <div class="meses">
+  {% for texto, nombre, p in periodos %}
+    {% set d = emitidos.get((s.id, p)) %}
+    <a class="mes" href="/portal/informes/{{ s.id }}/{{ texto }}">{{ nombre|capitalize }}
+      {%- if p == actual %} <span class="pastilla e-desconocido">en curso</span>
+      {%- elif d is not none %} <span class="pastilla e-ok">{{ d|pct }}</span>{% endif %}</a>
+  {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="tarjeta">No hay sitios visibles para su usuario.</div>
+{% endfor %}
+{% endblock %}

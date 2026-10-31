@@ -73,6 +73,16 @@ def firma_valida(ticket_id: uuid.UUID, firma: str) -> bool:
     return hmac.compare_digest(firma_seguimiento(ticket_id), firma)
 
 
+def firma_informe(sitio_id: uuid.UUID, periodo: str) -> str:
+    """Enlace del informe mensual para el cliente: firmado por sitio y mes ('2026-10')."""
+    llave = hmac.new(_llave(), b"idcmd-informe-v1", hashlib.sha256).digest()
+    return hmac.new(llave, sitio_id.bytes + periodo.encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def firma_informe_valida(sitio_id: uuid.UUID, periodo: str, firma: str) -> bool:
+    return hmac.compare_digest(firma_informe(sitio_id, periodo), firma)
+
+
 def url_publica() -> str:
     return os.environ.get("IDCMD_URL_PUBLICA", "http://localhost:8000").rstrip("/")
 
@@ -83,3 +93,7 @@ def enlace_seguimiento(ticket_id: uuid.UUID) -> str:
 
 def enlace_portal(ticket_id: uuid.UUID) -> str:
     return f"{url_publica()}/portal/tickets/{ticket_id}"
+
+
+def enlace_informe(sitio_id: uuid.UUID, periodo: str) -> str:
+    return f"{url_publica()}/informe/{sitio_id}/{periodo}/{firma_informe(sitio_id, periodo)}"

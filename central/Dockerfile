@@ -13,6 +13,11 @@ COPY central/src ./src
 RUN uv sync --locked --no-dev --no-editable
 
 FROM ${IMAGEN_BASE}
+# Informe mensual en PDF (WeasyPrint): Pango para el texto y una fuente con tildes y ñ.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 \
+       libharfbuzz-subset0 fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 idcmd \
     && useradd --system --uid 10001 --gid 10001 --home-dir /nonexistent --shell /usr/sbin/nologin idcmd
 # Fotos y firmas de los servicios (volumen): con dueño 10001 para que un volumen nuevo herede
@@ -20,7 +25,8 @@ RUN groupadd --system --gid 10001 idcmd \
 RUN mkdir -p /datos/archivos && chown -R 10001:10001 /datos
 COPY --from=construccion /repo/central/.venv /repo/central/.venv
 COPY central/migraciones /app/migraciones
-ENV PATH=/repo/central/.venv/bin:$PATH PYTHONUNBUFFERED=1 IDCMD_MIGRACIONES=/app/migraciones
+ENV PATH=/repo/central/.venv/bin:$PATH PYTHONUNBUFFERED=1 IDCMD_MIGRACIONES=/app/migraciones \
+    XDG_CACHE_HOME=/tmp/cache
 USER 10001
 EXPOSE 8000
 CMD ["uvicorn", "idcmd_central.app:crear_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]

@@ -13,6 +13,7 @@ from . import __version__
 from .db import BaseDatos
 from .ingesta.api import router as router_ingesta
 from .portal.campo import router as router_campo
+from .portal.informes import router as router_informes
 from .portal.rutas import router as router_portal
 
 # El portal no carga nada de terceros: htmx y la hoja de estilos se sirven desde aquí.
@@ -58,6 +59,7 @@ def crear_app(bd: BaseDatos | None = None) -> FastAPI:
     app.include_router(router_ingesta)
     app.include_router(router_portal)
     app.include_router(router_campo)
+    app.include_router(router_informes)
     app.mount(
         "/portal/estaticos",
         StaticFiles(directory=Path(__file__).parent / "portal" / "estaticos"),
@@ -68,7 +70,7 @@ def crear_app(bd: BaseDatos | None = None) -> FastAPI:
     async def cabeceras_seguridad(request: Request, llamar):
         respuesta = await llamar(request)
         ruta = request.url.path
-        if ruta == "/" or ruta.startswith(("/portal", "/seguimiento")):
+        if ruta == "/" or ruta.startswith(("/portal", "/seguimiento", "/informe")):
             for nombre, valor in CABECERAS_PORTAL.items():
                 if nombre == "Cache-Control" and "/estaticos/" in request.url.path:
                     continue
