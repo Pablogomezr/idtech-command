@@ -140,3 +140,39 @@ def test_clave_generada_y_teclas_especiales():
     assert len(clave) == 23 and clave.count("-") == 3
     assert not set(clave) & set("0O1lI")
     assert generar_clave() != clave
+
+
+async def test_usuarios_tecnico_y_supervisor_con_acceso(bd, dueno, datos, capsys):
+    """Técnico con su sitio y supervisor del contrato (cliente) con todo su cliente."""
+
+    def consola(*argumentos):
+        return main(list(argumentos))
+
+    def con_sitios(correo):
+        return dueno.execute(
+            "SELECT id FROM idcmd.usuarios WHERE correo = %s", (correo,)
+        ).fetchone()[0]
+
+    assert await asyncio.to_thread(consola, "usuarios", "crear", "--correo", "tec@idtech.test",
+        "--nombre", "Técnico Uno", "--rol", "tecnico", "--sitio", "sitio_a2",
+        "--generar-clave") == 0  # fmt: skip
+    assert await asyncio.to_thread(consola, "usuarios", "crear", "--correo", "sup@cliente.test",
+        "--nombre", "Supervisora", "--rol", "cliente", "--cliente", "Integradora A",
+        "--generar-clave") == 0  # fmt: skip
+    salida = capsys.readouterr().out
+    assert "acceso: sitio_a2: técnico principal" in salida
+    assert "acceso: ve todos los sitios de Integradora A" in salida
+    async with bd.como_usuario(con_sitios("tec@idtech.test")) as con:
+        cur = await con.execute("SELECT nombre FROM idcmd.sitios")
+        assert [n for (n,) in await cur.fetchall()] == ["sitio_a2"]
+    async with bd.como_usuario(con_sitios("sup@cliente.test")) as con:
+        cur = await con.execute("SELECT nombre FROM idcmd.sitios ORDER BY nombre")
+        assert [n for (n,) in await cur.fetchall()] == ["sitio_a1", "sitio_a2", "sitio_a3"]
+    # Sin sitio, un técnico no se crea (entraría y no vería nada).
+    with pytest.raises(SystemExit):
+        await asyncio.to_thread(consola, "usuarios", "crear", "--correo", "x@idtech.test",
+                                "--nombre", "X", "--rol", "tecnico", "--generar-clave")  # fmt: skip
+    assert await asyncio.to_thread(consola, "usuarios", "acceso", "--correo", "tec@idtech.test",
+                                   "--sitio", "sitio_a3") == 0  # fmt: skip
+    assert await asyncio.to_thread(consola, "usuarios", "listar") == 0
+    assert "sitio_a2, sitio_a3" in capsys.readouterr().out

@@ -5,6 +5,10 @@ idcmd-central agentes crear --sitio <uuid> --nombre "Mini PC sede norte"
 idcmd-central agentes revocar <agente_id>
 idcmd-central llave-totp                       # llave para cifrar los segundos factores
 idcmd-central usuarios crear --correo a@b.co --nombre "Pablo" --rol admin
+idcmd-central usuarios crear --correo t@b.co --nombre "Técnico" --rol tecnico --sitio "Oficina"
+idcmd-central usuarios crear --correo s@c.co --nombre "Supervisor" --rol cliente --cliente "IDtech"
+idcmd-central usuarios acceso --correo t@b.co --sitio "Sede 2"     # más sitios a un usuario
+idcmd-central usuarios listar
 idcmd-central preparar                         # producción: migraciones + rol de servicio
 idcmd-central inventario cargar --inventario sitio.yaml --salida /agente --url-central https://...
 idcmd-central laboratorio preparar --inventario oficina.yaml --salida /lab
@@ -228,7 +232,73 @@ def cmd_usuarios_restablecer_mfa(args) -> int:
     return 0
 
 
+def _cliente(con, texto: str) -> tuple[uuid.UUID, str]:
+    filas = con.execute(
+        "SELECT id, nombre FROM idcmd.clientes WHERE id::text = %s OR lower(nombre) = lower(%s)",
+        (texto, texto),
+    ).fetchall()
+    if len(filas) != 1:
+        sys.exit(f"'{texto}' coincide con {len(filas)} clientes: use el nombre exacto o el id")
+    return filas[0]
+
+
+def _validar_acceso(args) -> None:
+    """Sin sitios (técnico) o sin cliente (cliente) el usuario entra y no ve nada."""
+    if args.rol == "tecnico" and not args.sitio:
+        sys.exit("un técnico necesita al menos un --sitio (los sitios que atiende)")
+    if args.rol == "cliente" and not (args.cliente or args.sitio):
+        sys.exit("un usuario cliente necesita --cliente (todo el cliente) o --sitio")
+
+
+def dar_acceso(con, usuario_id: uuid.UUID, rol: str, sitios: list[str], cliente: str | None,
+               suplente: bool = False) -> list[str]:  # fmt: skip
+    """Técnico: asignación vigente a cada sitio. Cliente: alcance al cliente o a sus sitios."""
+    hechos = []
+    if rol == "tecnico":
+        tipo = "suplente" if suplente else "principal"
+        for texto in sitios:
+            sitio_id, nombre = _sitio(con, texto)
+            ya = con.execute(
+                "SELECT tecnico_id FROM idcmd.asignaciones_tecnico WHERE sitio_id = %s"
+                " AND tipo = %s AND vigente_hasta IS NULL",
+                (sitio_id, tipo),
+            ).fetchone()
+            if ya and ya[0] == usuario_id:
+                hechos.append(f"{nombre}: ya era el técnico {tipo}")
+                continue
+            if ya:  # un solo principal (y un suplente) vigente por sitio
+                con.execute(
+                    "UPDATE idcmd.asignaciones_tecnico SET vigente_hasta = now()"
+                    " WHERE sitio_id = %s AND tipo = %s AND vigente_hasta IS NULL",
+                    (sitio_id, tipo),
+                )
+            con.execute(
+                "INSERT INTO idcmd.asignaciones_tecnico (tecnico_id, cliente_id, sitio_id, tipo)"
+                " SELECT %s, cliente_id, id, %s FROM idcmd.sitios WHERE id = %s",
+                (usuario_id, tipo, sitio_id),
+            )
+            hechos.append(f"{nombre}: técnico {tipo}" + (" (reemplaza al anterior)" if ya else ""))
+    elif rol == "cliente":
+        if cliente and not sitios:
+            cliente_id, nombre = _cliente(con, cliente)
+            con.execute(
+                "INSERT INTO idcmd.alcances_usuario (usuario_id, cliente_id) VALUES (%s, %s)",
+                (usuario_id, cliente_id),
+            )
+            hechos.append(f"ve todos los sitios de {nombre}")
+        for texto in sitios:
+            sitio_id, nombre = _sitio(con, texto)
+            con.execute(
+                "INSERT INTO idcmd.alcances_usuario (usuario_id, cliente_id, sitio_id)"
+                " SELECT %s, cliente_id, id FROM idcmd.sitios WHERE id = %s",
+                (usuario_id, sitio_id),
+            )
+            hechos.append(f"ve el sitio {nombre}")
+    return hechos
+
+
 def cmd_usuarios_crear(args) -> int:
+    _validar_acceso(args)
     clave = _clave_de(args)
     try:
         usuario_id, secreto = crear_usuario(_dsn_admin(), args.correo, args.nombre, args.rol, clave)
@@ -238,7 +308,54 @@ def cmd_usuarios_crear(args) -> int:
             f" idcmd-central usuarios restablecer-mfa --correo {args.correo}"
         )
     print(f"usuario creado: {usuario_id} ({args.rol})")
+    with psycopg.connect(_dsn_admin()) as con:
+        for linea in dar_acceso(con, usuario_id, args.rol, args.sitio or [], args.cliente,
+                                args.suplente):  # fmt: skip
+            print(f"  acceso: {linea}")
     _mostrar_segundo_factor(args.correo, secreto)
+    return 0
+
+
+def cmd_usuarios_acceso(args) -> int:
+    """Agregar sitios a un técnico, o cliente/sitios a un usuario cliente, ya creado."""
+    with psycopg.connect(_dsn_admin()) as con:
+        fila = con.execute(
+            "SELECT id, rol::text FROM idcmd.usuarios WHERE correo = %s", (args.correo,)
+        ).fetchone()
+        if fila is None:
+            sys.exit(f"no existe el usuario {args.correo}")
+        args.rol = fila[1]
+        if args.rol == "admin":
+            sys.exit("un administrador ya ve todo")
+        _validar_acceso(args)
+        for linea in dar_acceso(con, fila[0], args.rol, args.sitio or [], args.cliente,
+                                args.suplente):  # fmt: skip
+            print(f"acceso: {linea}")
+    return 0
+
+
+def cmd_usuarios_listar(args) -> int:
+    with psycopg.connect(_dsn_admin()) as con:
+        for correo, nombre, rol, activo, acceso in con.execute(
+            """
+            SELECT u.correo, u.nombre, u.rol::text, u.activo,
+                   coalesce((SELECT string_agg(s.nombre || CASE a.tipo WHEN 'suplente'
+                                 THEN ' (suplente)' ELSE '' END, ', ' ORDER BY s.nombre)
+                               FROM idcmd.asignaciones_tecnico a
+                               JOIN idcmd.sitios s ON s.id = a.sitio_id
+                              WHERE a.tecnico_id = u.id AND a.vigente_hasta IS NULL),
+                            (SELECT string_agg(coalesce(s.nombre, r.nombre, c.nombre), ', ')
+                               FROM idcmd.alcances_usuario x
+                               JOIN idcmd.clientes c ON c.id = x.cliente_id
+                               LEFT JOIN idcmd.regionales r ON r.id = x.regional_id
+                               LEFT JOIN idcmd.sitios s ON s.id = x.sitio_id
+                              WHERE x.usuario_id = u.id), '')
+              FROM idcmd.usuarios u ORDER BY u.rol, u.correo
+            """
+        ):
+            estado = "" if activo else "  [inactivo]"
+            alcance = "todo" if rol == "admin" else (acceso or "— sin acceso asignado —")
+            print(f"{rol:8} {correo:36} {nombre:28} {alcance}{estado}")
     return 0
 
 
@@ -542,7 +659,19 @@ def main(argv: list[str] | None = None) -> int:
     u_crear.add_argument(
         "--generar-clave", action="store_true", help="clave aleatoria, sin teclear"
     )
+    u_crear.add_argument("--sitio", action="append", help="sitio (nombre o id); se puede repetir")
+    u_crear.add_argument("--cliente", help="usuario cliente: ve todos los sitios de este cliente")
+    u_crear.add_argument("--suplente", action="store_true", help="técnico suplente (no principal)")
     u_crear.set_defaults(fn=cmd_usuarios_crear)
+    u_acceso = usuarios.add_parser("acceso", help="dar sitios o cliente a un usuario existente")
+    u_acceso.add_argument("--correo", required=True)
+    u_acceso.add_argument("--sitio", action="append")
+    u_acceso.add_argument("--cliente")
+    u_acceso.add_argument("--suplente", action="store_true")
+    u_acceso.set_defaults(fn=cmd_usuarios_acceso)
+    usuarios.add_parser("listar", help="usuarios, rol y a qué tienen acceso").set_defaults(
+        fn=cmd_usuarios_listar
+    )
     u_mfa = usuarios.add_parser("restablecer-mfa", help="nuevo segundo factor para un usuario")
     u_mfa.add_argument("--correo", required=True)
     u_mfa.add_argument("--nueva-clave", action="store_true", help="cambiar también la clave")

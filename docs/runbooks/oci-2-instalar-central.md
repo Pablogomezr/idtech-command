@@ -123,7 +123,10 @@ Entra con `ssh -i $HOME\.ssh\idcmd_oci ubuntu@command.idtech.com.co`:
 
 | Para | Comando |
 |---|---|
-| Crear un usuario (técnico o cliente) | `sudo idcmd-central usuarios crear --correo ... --nombre "..." --rol tecnico` |
+| Crear un técnico (con los sitios que atiende) | `sudo idcmd-central usuarios crear --correo ... --nombre "..." --rol tecnico --sitio "Oficina IDtech" --generar-clave` |
+| Crear el supervisor del contrato (cliente, solo lectura) | `sudo idcmd-central usuarios crear --correo ... --nombre "..." --rol cliente --cliente "Nombre del cliente" --generar-clave` |
+| Dar más sitios a un usuario | `sudo idcmd-central usuarios acceso --correo ... --sitio "Otra sede"` (`--suplente` para técnico suplente) |
+| Ver usuarios y su acceso | `sudo idcmd-central usuarios listar` |
 | Celular perdido / nuevo segundo factor | `sudo idcmd-central usuarios restablecer-mfa --correo ...` |
 | Vincular Telegram | `sudo idcmd-central usuarios telegram --correo ... --chat-id ...` |
 | Activar correo o Telegram | Editar `/srv/idcmd/produccion.env` (`IDCMD_SMTP_*`, `IDCMD_TELEGRAM_TOKEN`) y volver a correr la instalación |
