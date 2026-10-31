@@ -176,3 +176,12 @@ async def test_usuarios_tecnico_y_supervisor_con_acceso(bd, dueno, datos, capsys
                                    "--sitio", "sitio_a3") == 0  # fmt: skip
     assert await asyncio.to_thread(consola, "usuarios", "listar") == 0
     assert "sitio_a2, sitio_a3" in capsys.readouterr().out
+
+
+async def test_crear_usuario_que_ya_existe_no_muestra_clave(bd, dueno, datos, capsys):
+    with pytest.raises(SystemExit) as fin:
+        await asyncio.to_thread(main, ["usuarios", "crear", "--correo", "tecnico_1@prueba.co",
+                                       "--nombre", "Otro", "--rol", "tecnico", "--sitio",
+                                       "sitio_a1", "--generar-clave"])  # fmt: skip
+    assert "ya existe" in str(fin.value) and "no se cambió nada" in str(fin.value)
+    assert "Clave nueva del portal" not in capsys.readouterr().out

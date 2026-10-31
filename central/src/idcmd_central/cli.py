@@ -299,6 +299,14 @@ def dar_acceso(con, usuario_id: uuid.UUID, rol: str, sitios: list[str], cliente:
 
 def cmd_usuarios_crear(args) -> int:
     _validar_acceso(args)
+    with psycopg.connect(_dsn_admin()) as con:
+        # Antes de mostrar una clave: si el usuario ya existe, esa clave no serviría de nada.
+        if con.execute("SELECT 1 FROM idcmd.usuarios WHERE correo = %s", (args.correo,)).fetchone():
+            sys.exit(
+                f"ya existe un usuario con el correo {args.correo} (no se cambió nada). Para darle"
+                f" acceso: usuarios acceso --correo {args.correo} --sitio ...; para una clave"
+                f" nueva: usuarios restablecer-mfa --correo {args.correo} --generar-clave"
+            )
     clave = _clave_de(args)
     try:
         usuario_id, secreto = crear_usuario(_dsn_admin(), args.correo, args.nombre, args.rol, clave)
