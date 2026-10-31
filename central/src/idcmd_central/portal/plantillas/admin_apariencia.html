@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "_figuras.html" import figura %}
+{% block titulo %}Apariencia de los equipos · IDtech Command{% endblock %}
+{% block contenido %}
+<div class="sub"><a href="/portal/admin">Administración</a> ›</div>
+<h1>Apariencia de los equipos</h1>
+<div class="sub">Cada equipo se dibuja según su referencia (bala, domo, torreta, PTZ, grabador, panel…). Si sube una foto
+  del modelo, todos los equipos de esa referencia la muestran en el tablero.</div>
+{% if aviso %}<div class="resumen resumen-bien">{{ aviso }}</div>{% endif %}
+<div class="tarjeta nota">
+  <b>Consejos para la foto:</b> el equipo de frente o a tres cuartos, sobre fondo blanco o transparente (PNG), sin
+  personas ni placas. Sirve la de la ficha técnica del distribuidor o una tomada por el técnico. El portal la reduce y le
+  quita los datos ocultos (ubicación, autor) antes de guardarla.
+</div>
+<div class="tabla"><table class="apariencia">
+  <thead><tr><th>Así se ve</th><th>Referencia</th><th>Tipo</th><th class="n">Equipos</th><th>Foto del modelo</th></tr></thead>
+  <tbody>{% for r in referencias %}
+    <tr><td>{{ figura(r.forma, 'ok', ('/portal/modelos/foto/' ~ r.foto.huella) if r.foto else none, FORMAS[r.forma]) }}</td>
+      <td>{% if r.modelo %}<b>{{ r.modelo }}</b>{% else %}<span class="sub" style="margin:0">Sin referencia en el inventario</span>{% endif %}
+        {% if r.marca %}<div class="sub" style="margin:0">{{ r.marca|capitalize }}</div>{% endif %}</td>
+      <td>{{ FORMAS[r.forma] }}</td>
+      <td class="n">{{ r.equipos }}</td>
+      <td>{% if r.modelo %}
+        <form class="subir-foto" method="post" action="/portal/admin/apariencia/foto" enctype="multipart/form-data">
+          <input type="hidden" name="modelo" value="{{ r.modelo }}">
+          <input type="file" name="archivo" accept="image/jpeg,image/png,image/webp" required>
+          <button type="submit" class="discreto">{{ 'Cambiar foto' if r.foto else 'Subir foto' }}</button>
+        </form>
+        {% if r.foto %}<form method="post" action="/portal/admin/apariencia/quitar" data-confirmar="¿Quitar la foto de {{ r.modelo }} y volver a la ilustración?">
+          <input type="hidden" name="modelo" value="{{ r.modelo }}"><button type="submit" class="discreto">Quitar foto</button></form>{% endif %}
+      {% else %}<span class="sub" style="margin:0">Escriba el modelo en el inventario del sitio para poder ponerle foto.</span>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="5" class="sub">No hay equipos en el inventario.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

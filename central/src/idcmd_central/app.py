@@ -16,6 +16,7 @@ from .portal.admin import router as router_admin
 from .portal.campo import router as router_campo
 from .portal.gestion import router as router_gestion
 from .portal.informes import router as router_informes
+from .portal.modelos import router as router_modelos
 from .portal.rutas import router as router_portal
 from .portal.servicios import router as router_servicios
 
@@ -66,6 +67,7 @@ def crear_app(bd: BaseDatos | None = None) -> FastAPI:
     app.include_router(router_servicios)
     app.include_router(router_admin)
     app.include_router(router_gestion)
+    app.include_router(router_modelos)
     app.mount(
         "/portal/estaticos",
         StaticFiles(directory=Path(__file__).parent / "portal" / "estaticos"),

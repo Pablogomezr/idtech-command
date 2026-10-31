@@ -1,3 +1,4 @@
+{% from "_figuras.html" import figura %}
 <div id="equipos" hx-get="/portal/sitios/{{ sitio.id }}/equipos" hx-trigger="every {{ REFRESCO_S }}s"
      hx-swap="outerHTML">
   {% set minutos = ((ahora - sitio.ultimo_latido).total_seconds() / 60) if sitio.ultimo_latido else none %}
@@ -36,12 +37,16 @@
 
   {% for eq in equipos %}
   <div class="tarjeta borde-{{ eq.estado }}" id="eq-{{ eq.id }}">
-    <div class="equipo-cab">
+    <div class="equipo-cab con-figura">
+      {% set ref = eq.referencia %}
+      {{ figura(eq.forma, eq.estado, (fotos or {}).get(clave_modelo(ref)) if ref else none, FORMAS[eq.forma] ~ (' · ' ~ ref if ref else '')) }}
+      <div class="equipo-texto">
       <span class="nombre">{{ eq.nombre }}</span>
       <span class="pastilla e-{{ eq.estado }}">{{ ESTADOS[eq.estado] }}</span>
       {% set tk = (tickets or {}).get(eq.id) %}
       {% if tk %}<a class="pastilla ticket" href="/portal/tickets/{{ tk.id }}">Ticket #{{ tk.numero }} · {{ ESTADOS_TICKET[tk.estado] }}</a>{% endif %}
-      <span class="modelo">{{ TIPOS_EQUIPO.get(eq.tipo_equipo, eq.tipo_equipo|legible) }}{% if eq.marca %} · {{ eq.marca|capitalize }}{% endif %}{% if eq.modelo %} {{ eq.modelo }}{% endif %}{% if eq.ubicacion %} · {{ eq.ubicacion }}{% endif %}</span>
+      <span class="modelo">{{ TIPOS_EQUIPO.get(eq.tipo_equipo, eq.tipo_equipo|legible) }}{% if eq.marca %} · {{ eq.marca|capitalize }}{% endif %}{% if eq.referencia %} {{ eq.referencia }}{% endif %}{% if eq.ubicacion %} · {{ eq.ubicacion }}{% endif %}</span>
+      </div>
     </div>
     {% for c in eq.chequeos %}
     {% set l = c.lectura %}

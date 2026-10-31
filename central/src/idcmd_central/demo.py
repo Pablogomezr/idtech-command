@@ -36,6 +36,16 @@ EQUIPOS = [
     ("cam5", "Cámara 5 · cerramiento norte", "camara", 2, 2.0, 30),
     ("panel", "Panel de acceso · recepción", "controladora", 1, 0.8, None),
 ]
+# Referencias comerciales comunes (no de un cliente): el tablero dibuja cada equipo según ellas.
+MODELOS = {
+    "nvr": ("dahua", "DHI-NVR5432-EI"),
+    "cam1": ("hikvision", "DS-2CD2T47G2-L"),
+    "cam2": ("hikvision", "DS-2CD2147G2-SU"),
+    "cam3": ("hikvision", "DS-2DE4425IW-DE"),
+    "cam4": ("dahua", "IPC-HDW2441T-S"),
+    "cam5": ("dahua", "IPC-HFW2441S-S"),
+    "panel": ("hikvision", "DS-K2602T"),
+}
 
 
 def _id(clave: str) -> uuid.UUID:
@@ -72,9 +82,10 @@ def _crear_estructura(con: psycopg.Connection) -> None:
         con.execute(
             "INSERT INTO idcmd.dispositivos (id, cliente_id, sitio_id, nombre, tipo_equipo, marca,"
             " modelo, direccion, criticidad, retencion_contratada_dias) VALUES"
-            " (%s, %s, %s, %s, %s, 'demo', 'Simulado', 'demo', %s, %s)"
-            " ON CONFLICT (id) DO NOTHING",
-            (_id(clave), cliente, sitio, nombre, tipo, criticidad, retencion),
+            " (%s, %s, %s, %s, %s, %s, %s, 'demo', %s, %s)"
+            # Las demos ya creadas toman las referencias al volver a prepararlas.
+            " ON CONFLICT (id) DO UPDATE SET marca = EXCLUDED.marca, modelo = EXCLUDED.modelo",
+            (_id(clave), cliente, sitio, nombre, tipo, *MODELOS[clave], criticidad, retencion),
         )
 
 

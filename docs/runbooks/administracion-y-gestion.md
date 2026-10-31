@@ -65,3 +65,34 @@ El cliente no ve la pestaña Técnicos: los nombres y el rendimiento del persona
 
 Para el comité del contrato: Equipos + Resumen del mes, descargados en Excel, junto con el
 informe mensual de SLA (PDF).
+
+## Apariencia de los equipos en el tablero
+Cada tarjeta del sitio muestra el equipo dibujado según su **referencia** (el modelo del
+inventario o, si falta, el que informa el propio equipo), con un punto del color de su estado
+(rojo y latiendo si está caído):
+
+| Referencia (ejemplos) | Se dibuja como |
+|---|---|
+| Hikvision DS-2CD2**T**…, DS-2CD2**0**…, DS-2CD2**6**… · Dahua IPC-**HFW**… | Cámara bala |
+| Hikvision DS-2CD2**1**…, **5**…, **7**… · Dahua IPC-**HDBW**… | Cámara domo |
+| Hikvision DS-2CD2**3**…, **H**… · Dahua IPC-**HDW**… | Cámara torreta |
+| Hikvision DS-2**DE**/**DF**… · Dahua **SD**… | Cámara PTZ |
+| Hikvision DS-2CD**63**… · Dahua **EBW**… | Ojo de pez |
+| NVR/DVR · servidor VMS | Grabador · servidor |
+| Hikvision DS-K**26**…/**27**… · Dahua **ASC**… | Panel de control de acceso |
+| Hikvision DS-K**1T**… · Dahua **ASI**… | Terminal de reconocimiento |
+| Hikvision DS-K1… · Dahua **ASR**… | Lectora |
+
+Lo que no se reconoce toma la figura de su tipo de equipo. Las ilustraciones son propias: no se
+descargan imágenes de los fabricantes (derechos de imagen, y el portal no depende de nubes de
+terceros).
+
+**Foto real por modelo** (opcional): *Administración → Apariencia de los equipos*. Se sube una
+foto por referencia y todos los equipos de ese modelo la muestran. El portal la reduce a 480 px,
+la convierte a WebP y le quita los metadatos (ubicación GPS, autor) antes de guardarla en la
+base (viaja con los respaldos cifrados). La usa el portal solo para usuarios con sesión.
+Recomendado: fondo blanco o PNG transparente, sin personas ni placas. Si usa la imagen de la
+ficha de un fabricante o distribuidor, verifique que tiene permiso para usarla.
+
+La demo trae referencias comunes (Hikvision y Dahua). Una demo creada antes de la v35 las toma al
+volver a ejecutar `sudo idcmd-central demo preparar …` (no cambia claves ni duplica nada).

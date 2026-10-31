@@ -11,6 +11,7 @@ from datetime import datetime
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
+from . import apariencia
 from .interpretacion import Lectura, interpretar
 
 # Gravedad para resumir un equipo con varios chequeos: manda el peor.
@@ -43,6 +44,27 @@ class Equipo:
     def estado(self) -> str:
         estados = [c.estado for c in self.chequeos if c.estado]
         return max(estados, key=GRAVEDAD.__getitem__) if estados else "sin_datos"
+
+    @property
+    def referencia(self) -> str | None:
+        """El modelo del inventario; si no lo escribieron, el que informa el propio equipo."""
+        if self.modelo and self.modelo.strip():
+            return self.modelo.strip()
+        for c in self.chequeos:
+            valor = c.metricas.get("modelo")
+            if isinstance(valor, str) and valor.strip():
+                return valor.strip()
+        return None
+
+    @property
+    def forma(self) -> str:
+        return apariencia.forma(self.tipo_equipo, self.referencia)
+
+
+async def fotos_modelo(con: AsyncConnection) -> dict[str, str]:
+    """{referencia normalizada: dirección de su foto} de los modelos con foto."""
+    cur = await con.execute("SELECT modelo, encode(sha256, 'hex') FROM idcmd.fotos_modelo")
+    return {m: f"/portal/modelos/foto/{h}" for m, h in await cur.fetchall()}
 
 
 async def usuario(con: AsyncConnection) -> dict | None:

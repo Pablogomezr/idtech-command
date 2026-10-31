@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from ..servicio.reglas import firma_valida
-from . import consultas, presentacion
+from . import apariencia, consultas, presentacion
 from .seguridad import (
     descifrar_secreto,
     generar_token_sesion,
@@ -51,6 +51,8 @@ plantillas.env.globals.update(
     ESTADOS=presentacion.ESTADOS,
     CHEQUEOS=presentacion.CHEQUEOS,
     TIPOS_EQUIPO=presentacion.TIPOS_EQUIPO,
+    FORMAS=apariencia.FORMAS,
+    clave_modelo=apariencia.clave_modelo,
     ESTADOS_TICKET=presentacion.ESTADOS_TICKET,
     PRIORIDADES=presentacion.PRIORIDADES,
     CIERRES=presentacion.CIERRES,
@@ -230,8 +232,10 @@ async def ver_sitio(request: Request, sitio_id: uuid.UUID):
         if datos is None:  # no existe o la RLS no lo deja ver: misma respuesta
             raise HTTPException(status_code=404)
         equipos = await consultas.equipos(con, sitio_id)
+        fotos = await consultas.fotos_modelo(con)
         await consultas.auditar(con, usuario_id, "ver", f"/portal/sitios/{sitio_id}", _ip(request))
-    return _pagina(request, "sitio.html", {"usuario": usuario, "sitio": datos, "equipos": equipos})
+    return _pagina(request, "sitio.html", {"usuario": usuario, "sitio": datos, "equipos": equipos,
+                                           "fotos": fotos})  # fmt: skip
 
 
 @router.get("/portal/sitios/{sitio_id}/equipos", response_class=HTMLResponse)
@@ -247,9 +251,9 @@ async def fragmento_equipos(request: Request, sitio_id: uuid.UUID):
             raise HTTPException(status_code=404)
         equipos = await consultas.equipos(con, sitio_id)
         tickets = await consultas.tickets_abiertos_por_equipo(con, sitio_id)
-    return _pagina(
-        request, "_equipos.html", {"sitio": datos, "equipos": equipos, "tickets": tickets}
-    )
+        fotos = await consultas.fotos_modelo(con)
+    return _pagina(request, "_equipos.html", {"sitio": datos, "equipos": equipos,
+                                              "tickets": tickets, "fotos": fotos})  # fmt: skip
 
 
 @router.get("/portal/sitios/{sitio_id}/auditoria", response_class=HTMLResponse)

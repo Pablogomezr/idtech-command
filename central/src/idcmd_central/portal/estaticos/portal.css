@@ -321,3 +321,42 @@ code.clave { display: inline-block; font: 600 17px ui-monospace, "IBM Plex Mono"
 main { min-width: 0; }
 th.dos { white-space: normal; line-height: 1.25; }
 label.casilla .sub { display: inline; margin: 0; }
+
+/* Figura del equipo (ilustración propia o foto del modelo) con su estado. */
+.equipo-cab.con-figura { flex-wrap: nowrap; align-items: center; gap: 14px; }
+.equipo-texto { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; min-width: 0; }
+.figura-marco { position: relative; flex: none; width: 92px; height: 69px; border-radius: 12px;
+  background: linear-gradient(160deg, #f7f9fc 0%, #e9eef5 100%); border: 1px solid var(--borde);
+  display: grid; place-items: center; overflow: hidden; }
+.figura { width: 84px; height: 63px; display: block; }
+img.figura.foto { object-fit: contain; width: 86px; height: 64px; mix-blend-mode: multiply; }
+.figura-punto { position: absolute; top: 6px; right: 6px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--nd); box-shadow: 0 0 0 2px #fff; }
+.figura-marco.fe-ok .figura-punto { background: var(--ok); }
+.figura-marco.fe-degradado .figura-punto { background: var(--deg); }
+.figura-marco.fe-caido .figura-punto { background: var(--caido); animation: latido 1.6s ease-in-out infinite; }
+@keyframes latido { 50% { box-shadow: 0 0 0 2px #fff, 0 0 0 6px color-mix(in srgb, var(--caido) 30%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .figura-marco.fe-caido .figura-punto { animation: none; } }
+.figura .f-s { fill: #0c1726; opacity: .09; }
+.figura .f-c { fill: #f4f6fa; stroke: #8a98ad; stroke-width: 1.2; }
+.figura .f-c2 { fill: #ffffff; stroke: #8a98ad; stroke-width: 1.2; }
+.figura .f-c3 { fill: #d3dae5; stroke: #8a98ad; stroke-width: 1.2; }
+.figura .f-cup { fill: #1d2c44; fill-opacity: .88; stroke: #8a98ad; stroke-width: 1.2; }
+.figura .f-o { fill: #15233a; }
+.figura .f-v { fill: #2f6fc0; }
+.figura .f-brillo { fill: #fff; opacity: .85; }
+.figura .f-reflejo { fill: none; stroke: #fff; stroke-opacity: .35; stroke-width: 2.4; stroke-linecap: round; }
+.figura .f-a { fill: #F08A12; }
+.figura .f-mini { fill: #9fb0c6; }
+.figura .f-cara { fill: none; stroke: #7fb0ea; stroke-width: 2; stroke-linecap: round; }
+.figura .f-cerradura { fill: none; stroke: #15233a; stroke-width: 2.2; }
+.figura .f-rayo { fill: #F08A12; }
+.figura .f-led { fill: var(--nd); }
+.figura-marco.fe-ok .f-led { fill: var(--ok); }
+.figura-marco.fe-degradado .f-led { fill: var(--deg); }
+.figura-marco.fe-caido .f-led { fill: var(--caido); }
+@media (max-width: 560px) { .figura-marco { width: 68px; height: 51px; } .figura { width: 62px; height: 47px; }
+  img.figura.foto { width: 64px; height: 48px; } }
+table.apariencia td { vertical-align: middle; }
+form.subir-foto { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 6px; }
+form.subir-foto input[type=file] { font-size: 13px; max-width: 240px; }

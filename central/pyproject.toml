@@ -15,6 +15,7 @@ dependencies = [
     "pyyaml>=6",
     "weasyprint>=66",
     "segno>=1.6",
+    "pillow>=11",  # ya viene con WeasyPrint; se usa para reducir las fotos de los modelos
 ]
 
 [project.scripts]

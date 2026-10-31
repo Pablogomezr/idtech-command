@@ -77,6 +77,9 @@ central/     FastAPI: ingesta + portal + worker (idcmd_central)
                                  (definiciones puras en informes/gestion.py)
   src/idcmd_central/portal/admin.py      sitios, usuarios, técnicos y asignaciones (solo admin;
                                  funciones SECURITY DEFINER de la migración 0010)
+  src/idcmd_central/portal/apariencia.py  figura del equipo según la referencia (bala, domo, PTZ,
+                                 grabador, panel...) + modelos.py (foto por modelo, solo admin,
+                                 WebP sin EXIF en idcmd.fotos_modelo); ilustraciones en _figuras.html
   src/idcmd_central/demo.py      cliente demo (equipos simulados, historial; nunca avisa: es_demo)
 docs/        adr/, runbooks/, plantillas/, supuestos.md
 despliegue/  laboratorio/ (compose + iniciar.ps1 para un PC), minipc/ (nftables),
@@ -204,4 +207,5 @@ Dahua: **nunca** usar `configManager.cgi` (RemoteDevice devuelve las claves de l
 | E4 | Informe mensual de SLA: disponibilidad ponderada, exclusiones, cumplimiento de tickets, tendencia, PDF, envío el día 1 | ✅ Entrega 8 (probado con Postgres real y PDF en el contenedor) |
 | E4 | Reporte de servicios (por equipo, falla, técnico; CSV) y cliente demo | ✅ Entrega 9 |
 | E4 | Administración en el portal (sitios, técnicos, asignaciones, QR del 2FA) y gestión (rendimiento de técnicos, confiabilidad de equipos) | ✅ Entrega 10 |
+| E4 | Apariencia de los equipos en el tablero (figura por referencia, foto por modelo) | ✅ Entrega 11 |
 | E3–E6 | Servicio parte 3 (acta PDF, encuesta, cotización de repuestos), piloto | Pendiente |
