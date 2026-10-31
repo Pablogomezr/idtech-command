@@ -294,3 +294,30 @@ th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; backgrou
 .equipo-cab .nombre { font-family: var(--f-titulo); font-weight: 700; font-size: 15.5px; }
 .acta .logo-simbolo { height: 30px; } .acta .logo-letras { height: 15px; }
 @media print { aside.menu, header.barra-publica { display: none !important; } body.con-menu { display: block; } }
+
+/* Administración: formularios, credenciales */
+.cabecera-seccion { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 26px; }
+.cabecera-seccion h2 { margin: 0; }
+form.formulario fieldset { border: 0; margin: 0 0 14px; padding: 0; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px 16px; }
+form.formulario legend { font: 700 15px var(--f-titulo); padding: 0 0 8px; color: var(--marca); }
+form.formulario label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--suave); font-weight: 500; }
+form.formulario label.ancho, form.formulario .ancho { grid-column: 1 / -1; }
+form.formulario label.casilla { flex-direction: row; align-items: center; gap: 8px; color: var(--texto); font-weight: 400; }
+form.formulario input:not([type=checkbox]), form.formulario select { padding: 10px; font: 15px var(--f-texto);
+  border: 1px solid var(--borde); border-radius: 10px; background: var(--tarjeta); color: var(--texto); }
+form.formulario input:disabled { background: var(--tinte); }
+.lista-sitios { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 16px; }
+td.acciones { white-space: nowrap; text-align: right; }
+td.acciones > * { display: inline-block; vertical-align: middle; margin: 0 0 0 6px; }
+tr.inactivo td { opacity: .55; }
+.credenciales { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+code.clave { display: inline-block; font: 600 17px ui-monospace, "IBM Plex Mono", monospace; letter-spacing: .04em;
+  background: var(--tinte); border: 1px solid var(--borde); padding: 8px 12px; border-radius: 8px; user-select: all; }
+.qr { background: #fff; display: inline-block; padding: 6px; border-radius: 10px; border: 1px solid var(--borde); }
+.qr svg { display: block; width: 210px; height: 210px; }
+
+/* Una tabla ancha se desplaza dentro de su recuadro, no estira la página. */
+main { min-width: 0; }
+th.dos { white-space: normal; line-height: 1.25; }
+label.casilla .sub { display: inline; margin: 0; }

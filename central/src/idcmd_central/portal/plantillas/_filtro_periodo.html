@@ -1,0 +1,10 @@
+<form class="tarjeta filtros" method="get">
+  <label>Desde <input type="month" name="desde" value="{{ filtro.desde }}"></label>
+  <label>Hasta <input type="month" name="hasta" value="{{ filtro.hasta }}"></label>
+  <label>Sitio
+    <select name="sitio"><option value="">Todos</option>
+      {% for s in sitios %}<option value="{{ s.id }}" {{ 'selected' if filtro.sitio == s.id|string }}>{{ s.nombre }}</option>{% endfor %}
+    </select></label>
+  <button type="submit">Ver</button>
+  <a class="boton sec" href="{{ csv }}?{{ consulta }}">Descargar Excel (CSV)</a>
+</form>

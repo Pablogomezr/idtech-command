@@ -3,6 +3,7 @@
 {% block contenido %}
 <h1>Reporte de servicios</h1>
 <div class="sub">Cuántos servicios hubo, en qué equipos, de qué fallas, quién los atendió y si se cumplió el SLA.</div>
+{% include "_pestanas_servicios.html" %}
 
 <form class="tarjeta filtros" method="get" action="/portal/servicios">
   <label>Desde <input type="month" name="desde" value="{{ filtro.desde }}"></label>

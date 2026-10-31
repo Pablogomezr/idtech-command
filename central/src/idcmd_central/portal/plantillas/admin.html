@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block titulo %}Administración · IDtech Command{% endblock %}
+{% block contenido %}
+<h1>Administración</h1>
+<div class="sub">Sitios, técnicos y usuarios. Los equipos de cada sitio se cargan con su inventario (conectar-sitio).</div>
+{% if aviso %}<div class="resumen resumen-bien">{{ aviso }}</div>{% endif %}
+
+<div class="cabecera-seccion"><h2>Sitios</h2><a class="boton" href="/portal/admin/sitios/nuevo">+ Nuevo sitio</a></div>
+<div class="tabla"><table>
+  <thead><tr><th>Cliente</th><th>Sitio</th><th>Ciudad</th><th class="n">Equipos</th><th>Técnico principal</th><th>Suplente</th><th></th></tr></thead>
+  <tbody>{% for s in sitios %}
+    <tr><td>{{ s.cliente }}<div class="sub" style="margin:0">{{ s.regional }}</div></td><td><b>{{ s.nombre }}</b></td><td>{{ s.ciudad or "—" }}</td>
+      <td class="n">{{ s.equipos }}</td>
+      <td>{{ s.principal or "" }}{% if not s.principal %}<span class="pastilla e-degradado">sin técnico</span>{% endif %}</td>
+      <td>{{ s.suplente or "—" }}</td><td><a href="/portal/admin/sitios/{{ s.id }}">Editar</a></td></tr>
+  {% else %}<tr><td colspan="7" class="sub">No hay sitios todavía.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<div class="cabecera-seccion"><h2>Usuarios</h2><a class="boton" href="/portal/admin/usuarios/nuevo">+ Nuevo usuario</a></div>
+<div class="tabla"><table>
+  <thead><tr><th>Nombre</th><th>Rol</th><th>Acceso</th><th>Estado</th><th></th></tr></thead>
+  <tbody>{% for u in usuarios %}
+    <tr class="{{ '' if u.activo else 'inactivo' }}"><td><b>{{ u.nombre }}</b><div class="sub" style="margin:0">{{ u.correo }}</div></td>
+      <td>{{ ROLES.get(u.rol, u.rol) }}</td>
+      <td>{% if u.rol == 'admin' %}Todo{% elif u.acceso %}{{ u.acceso }}{% else %}<span class="pastilla e-degradado">sin acceso</span>{% endif %}</td>
+      <td><span class="pastilla {{ 'e-ok' if u.activo else 'e-desconocido' }}">{{ 'Activo' if u.activo else 'Inactivo' }}</span></td>
+      <td class="acciones">
+        {% if u.rol != 'admin' %}<a href="/portal/admin/usuarios/{{ u.id }}">Acceso</a>{% endif %}
+        <form method="post" action="/portal/admin/usuarios/{{ u.id }}/restablecer" data-confirmar="¿Generar clave y segundo factor nuevos para {{ u.nombre }}? Se cerrarán sus sesiones."><button class="discreto">Nueva clave</button></form>
+        {% if u.id != usuario.id %}<form method="post" action="/portal/admin/usuarios/{{ u.id }}/activo"{% if u.activo %} data-confirmar="¿Desactivar a {{ u.nombre }}? Se cerrarán sus sesiones."{% endif %}><input type="hidden" name="activo" value="{{ 'no' if u.activo else 'si' }}"><button class="discreto">{{ 'Desactivar' if u.activo else 'Activar' }}</button></form>{% endif %}
+      </td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endblock %}

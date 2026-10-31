@@ -101,6 +101,12 @@
     });
   });
 
+  // Confirmación antes de acciones de administración (sin JavaScript en línea: lo prohíbe la CSP).
+  document.querySelectorAll("form[data-confirmar]").forEach(function (f) {
+    f.addEventListener("submit", function (e) {
+      if (!window.confirm(f.getAttribute("data-confirmar"))) e.preventDefault();
+    });
+  });
   document.querySelectorAll("[data-imprimir]").forEach(function (a) {
     a.addEventListener("click", function (e) { e.preventDefault(); window.print(); });
   });

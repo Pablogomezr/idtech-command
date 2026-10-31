@@ -73,6 +73,10 @@ central/     FastAPI: ingesta + portal + worker (idcmd_central)
                                  informe.py (datos -> resumen), emitir.py (día 1, 6 a. m.), PDF
                                  (WeasyPrint), gráfico SVG; portal/informes.py (portal y enlace)
   src/idcmd_central/portal/servicios.py  reporte de servicios por equipo/falla/técnico + CSV
+  src/idcmd_central/portal/gestion.py    rendimiento de técnicos y confiabilidad de equipos + CSV
+                                 (definiciones puras en informes/gestion.py)
+  src/idcmd_central/portal/admin.py      sitios, usuarios, técnicos y asignaciones (solo admin;
+                                 funciones SECURITY DEFINER de la migración 0010)
   src/idcmd_central/demo.py      cliente demo (equipos simulados, historial; nunca avisa: es_demo)
 docs/        adr/, runbooks/, plantillas/, supuestos.md
 despliegue/  laboratorio/ (compose + iniciar.ps1 para un PC), minipc/ (nftables),
@@ -199,4 +203,5 @@ Dahua: **nunca** usar `configManager.cgi` (RemoteDevice devuelve las claves de l
 | E5 | Producción: central en OCI Bogotá con HTTPS, respaldos cifrados, agente de sitio | ✅ Entrega 7 (publicada en command.idtech.com.co) |
 | E4 | Informe mensual de SLA: disponibilidad ponderada, exclusiones, cumplimiento de tickets, tendencia, PDF, envío el día 1 | ✅ Entrega 8 (probado con Postgres real y PDF en el contenedor) |
 | E4 | Reporte de servicios (por equipo, falla, técnico; CSV) y cliente demo | ✅ Entrega 9 |
+| E4 | Administración en el portal (sitios, técnicos, asignaciones, QR del 2FA) y gestión (rendimiento de técnicos, confiabilidad de equipos) | ✅ Entrega 10 |
 | E3–E6 | Servicio parte 3 (acta PDF, encuesta, cotización de repuestos), piloto | Pendiente |

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block titulo %}Nuevo usuario · IDtech Command{% endblock %}
+{% block contenido %}
+<div class="sub"><a href="/portal/admin">Administración</a> ›</div>
+<h1>Nuevo usuario</h1>
+<div class="sub">La clave y el segundo factor se generan al azar y se muestran una sola vez, con un código QR para el celular.</div>
+{% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+<form class="tarjeta formulario" method="post" action="/portal/admin/usuarios">
+  <fieldset><legend>Persona</legend>
+    <label>Nombre <input name="nombre" required maxlength="120" value="{{ previo.nombre or '' }}"></label>
+    <label>Correo <input name="correo" type="email" required maxlength="254" value="{{ previo.correo or '' }}"></label>
+    <label>Rol
+      <select name="rol" id="rol">{% for k, v in ROLES.items() %}<option value="{{ k }}" {{ 'selected' if previo.rol == k }}>{{ v }}</option>{% endfor %}</select></label>
+  </fieldset>
+  <fieldset><legend>Acceso</legend>
+    <p class="nota ancho"><b>Técnico:</b> marque los sitios que atiende (queda como técnico principal, o suplente si marca la casilla).
+      <b>Cliente:</b> elija su cliente para que vea todos sus sitios, o marque sitios puntuales. <b>Administrador:</b> ve todo.</p>
+    <label>Cliente (todos sus sitios)
+      <select name="cliente_id"><option value="">—</option>{% for c in clientes %}<option value="{{ c.id }}" {{ 'selected' if previo.cliente_id == c.id|string }}>{{ c.nombre }}</option>{% endfor %}</select></label>
+    <label class="casilla"><input type="checkbox" name="suplente" value="1" {{ 'checked' if previo.suplente }}> Técnico suplente (no principal)</label>
+    <div class="ancho lista-sitios">{% for s in sitios %}
+      <label class="casilla"><input type="checkbox" name="sitios" value="{{ s.id }}" {{ 'checked' if s.id|string in (previo.sitios or []) }}> <span>{{ s.nombre }} <span class="sub">· {{ s.cliente }}</span></span></label>
+    {% else %}<p class="nota">No hay sitios: cree uno primero.</p>{% endfor %}</div>
+  </fieldset>
+  <div class="botones"><button type="submit">Crear usuario</button><a class="boton sec" href="/portal/admin">Cancelar</a></div>
+</form>
+{% endblock %}

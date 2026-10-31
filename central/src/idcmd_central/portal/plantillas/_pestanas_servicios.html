@@ -1,0 +1,7 @@
+{#- Pestañas del menú Servicios; conserva el periodo y el sitio elegidos. -#}
+{% set q = 'desde=' ~ filtro.desde ~ '&hasta=' ~ filtro.hasta ~ ('&sitio=' ~ filtro.sitio if filtro.sitio else '') %}
+<nav class="pestanas">
+  <a href="/portal/servicios?{{ q }}" class="{{ 'activa' if pestana == 'resumen' }}">Resumen</a>
+  {% if usuario.rol != 'cliente' %}<a href="/portal/servicios/tecnicos?{{ q }}" class="{{ 'activa' if pestana == 'tecnicos' }}">{{ 'Mi rendimiento' if usuario.rol == 'tecnico' else 'Técnicos' }}</a>{% endif %}
+  <a href="/portal/servicios/equipos?{{ q }}" class="{{ 'activa' if pestana == 'equipos' }}">Equipos</a>
+</nav>

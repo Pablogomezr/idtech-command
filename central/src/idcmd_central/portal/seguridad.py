@@ -100,3 +100,26 @@ def generar_token_sesion() -> str:
 
 def hash_sesion(token: str) -> bytes:
     return hashlib.sha256(token.encode()).digest()
+
+
+# --- Claves del portal generadas --------------------------------------------------------------
+
+# Sin caracteres que se confunden (0/O, 1/l/I) para copiarla o dictarla sin errores.
+_ALFABETO_CLAVE = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def generar_clave() -> str:
+    """Clave aleatoria de 4 grupos de 5 (~114 bits), p. ej. Kq7mX-p2t9V-dRhL4-w8Nc3."""
+    return "-".join("".join(secrets.choice(_ALFABETO_CLAVE) for _ in range(5)) for _ in range(4))
+
+
+def qr_svg(texto: str) -> str:
+    """Código QR en SVG (para escanear el segundo factor con el celular)."""
+    import io
+
+    import segno
+
+    salida = io.BytesIO()
+    segno.make(texto, error="m").save(salida, kind="svg", scale=5, border=2, dark="#0c1726",
+                                      xmldecl=False, svgns=True)  # fmt: skip
+    return salida.getvalue().decode()

@@ -122,6 +122,7 @@ async def _datos(request: Request, usuario_id: uuid.UUID, q: dict) -> dict:
             "todos": "" if mios else "1",
         },  # fmt: skip
         "es_tecnico": es_tecnico,
+        "pestana": "resumen",
         "mios": mios,
         "ahora": ahora,
     }

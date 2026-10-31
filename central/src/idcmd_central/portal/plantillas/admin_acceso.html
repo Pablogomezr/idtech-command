@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block titulo %}Acceso de {{ otro.nombre }} · IDtech Command{% endblock %}
+{% block contenido %}
+<div class="sub"><a href="/portal/admin">Administración</a> ›</div>
+<h1>Acceso de {{ otro.nombre }}</h1>
+<div class="sub">{{ otro.correo }} · {{ ROLES.get(otro.rol, otro.rol) }}</div>
+{% if aviso %}<div class="resumen resumen-bien">{{ aviso }}</div>{% endif %}
+<div class="tarjeta">
+  <h2 style="margin-top:0">Acceso actual</h2>
+  <ul class="lista-atencion">
+  {% for a in asignaciones %}<li>{{ a.sitio }} <span class="pastilla e-ticket">{{ a.tipo }}</span>
+    <form method="post" action="/portal/admin/usuarios/{{ otro.id }}/acceso" style="display:inline"><input type="hidden" name="quitar" value="{{ a.id }}"><button class="discreto">Quitar</button></form></li>{% endfor %}
+  {% for x in alcances %}<li>{{ x.sitio or ('Todos los sitios de ' ~ x.cliente) }}
+    <form method="post" action="/portal/admin/usuarios/{{ otro.id }}/acceso" style="display:inline"><input type="hidden" name="quitar" value="{{ x.id }}"><button class="discreto">Quitar</button></form></li>{% endfor %}
+  {% if not asignaciones and not alcances %}<li class="sub">Sin acceso: este usuario entra y no ve nada.</li>{% endif %}
+  </ul>
+</div>
+<form class="tarjeta formulario" method="post" action="/portal/admin/usuarios/{{ otro.id }}/acceso">
+  <fieldset><legend>Agregar acceso</legend>
+    {% if otro.rol == 'cliente' %}
+    <label>Cliente (todos sus sitios)
+      <select name="cliente_id"><option value="">—</option>{% for c in clientes %}<option value="{{ c.id }}">{{ c.nombre }}</option>{% endfor %}</select></label>
+    {% else %}
+    <label class="casilla"><input type="checkbox" name="suplente" value="1"> Como suplente (no principal)</label>
+    <p class="nota ancho">Si el sitio ya tiene técnico principal, este lo reemplaza.</p>
+    {% endif %}
+    <div class="ancho lista-sitios">{% for s in sitios %}
+      <label class="casilla"><input type="checkbox" name="sitios" value="{{ s.id }}"> <span>{{ s.nombre }} <span class="sub">· {{ s.cliente }}</span></span></label>{% endfor %}</div>
+  </fieldset>
+  <div class="botones"><button type="submit">Agregar</button></div>
+</form>
+{% endblock %}

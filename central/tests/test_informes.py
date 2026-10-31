@@ -201,7 +201,8 @@ async def test_enlace_del_cliente_solo_con_informe_emitido(bd, datos, mes_con_da
         assert (await c.get(ruta + "/pdf")).content[:5] == b"%PDF-"
         otro = f"/informe/{datos['sitio_a2']}/{periodo}/{firma_informe(sitio, periodo)}"
         assert (await c.get(otro)).status_code == 404  # la firma es de otro sitio
-        assert (await c.get(ruta[:-1] + "0")).status_code == 404
+        alterada = ruta[:-1] + ("1" if ruta.endswith("0") else "0")  # siempre otra firma
+        assert (await c.get(alterada)).status_code == 404
 
 
 def test_consola_exclusiones_meta_y_emision(base_pruebas, dueno, datos, mes_con_datos, monkeypatch,

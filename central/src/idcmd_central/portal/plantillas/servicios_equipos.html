@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titulo %}Confiabilidad de equipos · IDtech Command{% endblock %}
+{% block contenido %}
+<h1>Confiabilidad de los equipos</h1>
+<div class="sub">Cuáles equipos fallan más, cada cuánto, cuánto duran sus caídas y cuántas veces hubo que ir por ellos.</div>
+{% include "_pestanas_servicios.html" %}
+{% set csv = '/portal/servicios/equipos.csv' %}{% include "_filtro_periodo.html" %}
+<div class="tabla"><table>
+  <thead><tr><th>Equipo</th><th class="n">Disponibilidad</th><th class="n">Caídas</th><th class="n dos">Falla<br>cada</th>
+    <th class="n dos">Duración<br>media</th><th class="n dos">Tiempo<br>caído</th><th class="dos">Última<br>caída</th><th class="n">Servicios</th>
+    <th class="n">Visitas</th><th class="n">Reincidencias</th></tr></thead>
+  <tbody>{% for r in filas %}
+    <tr><td><b>{{ r.equipo }}</b><div class="sub" style="margin:0">{{ TIPOS_EQUIPO.get(r.tipo, r.tipo) }}{% if multisitio %} · {{ r.sitio }}{% endif %}</div></td>
+      <td class="n">{% if r.disponibilidad is none %}<span class="pastilla e-desconocido">sin datos</span>{% else %}<span class="pastilla {{ 'e-ok' if r.disponibilidad >= 99.5 else ('e-degradado' if r.disponibilidad >= 98 else 'e-caido') }}">{{ r.disponibilidad|pct }}</span>{% endif %}</td>
+      <td class="n"><b>{{ r.caidas }}</b></td>
+      <td class="n">{{ duracion(r.mtbf_s) if r.mtbf_s else '—' }}</td>
+      <td class="n">{{ duracion(r.mttr_s) if r.mttr_s else '—' }}</td>
+      <td class="n">{{ duracion(r.caido_s) if r.caido_s else '—' }}</td>
+      <td>{{ r.ultima_caida|hora("%d/%m %H:%M") if r.ultima_caida else '—' }}</td>
+      <td class="n">{{ r.servicios or '—' }}</td><td class="n">{{ r.visitas or '—' }}</td>
+      <td class="n">{% if r.reincidencias %}<span class="pastilla e-caido">{{ r.reincidencias }}</span>{% else %}—{% endif %}</td></tr>
+  {% else %}<tr><td colspan="10" class="sub">No hay equipos en los sitios elegidos.</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="tarjeta nota">
+  <b>Cómo leerlo.</b> <b>Falla cada</b>: tiempo medido ÷ número de caídas (más alto es mejor). <b>Duración media</b>: cuánto dura cada caída.
+  <b>Visitas</b>: servicios en los que el técnico fue al sitio. <b>Reincidencias</b>: servicios abiertos dentro de {{ dias_reincidencia }} días
+  después de cerrado el anterior del mismo equipo: candidatos a cambio de equipo o a revisión de la instalación.
+</div>
+{% endblock %}

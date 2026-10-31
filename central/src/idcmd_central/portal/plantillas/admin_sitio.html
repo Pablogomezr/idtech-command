@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titulo %}{{ 'Editar' if sitio and sitio.id else 'Nuevo' }} sitio · IDtech Command{% endblock %}
+{% block contenido %}
+<div class="sub"><a href="/portal/admin">Administración</a> ›</div>
+<h1>{{ 'Editar sitio' if sitio and sitio.id else 'Nuevo sitio' }}</h1>
+{% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+<form class="tarjeta formulario" method="post" action="/portal/admin/sitios">
+  {% if sitio and sitio.id %}<input type="hidden" name="sitio_id" value="{{ sitio.id }}"><input type="hidden" name="cliente_id" value="{{ sitio.cliente_id }}">{% endif %}
+  <fieldset><legend>Cliente</legend>
+    {% if sitio and sitio.id %}
+      <label>Cliente <input value="{{ sitio.cliente }}" disabled></label>
+    {% else %}
+      <label>Cliente existente
+        <select name="cliente_id"><option value="">— elegir —</option>{% for c in clientes %}<option value="{{ c.id }}" {{ 'selected' if sitio and sitio.cliente_id == c.id|string }}>{{ c.nombre }}</option>{% endfor %}</select></label>
+      <label>… o cliente nuevo <input name="cliente_nuevo" maxlength="120" placeholder="Nombre del cliente nuevo"></label>
+    {% endif %}
+    <label>Regional / zona <input name="regional" list="regionales" maxlength="120" value="{{ sitio.regional if sitio else '' }}" placeholder="p. ej. Atlántico"></label>
+    <datalist id="regionales">{% for r in regionales %}<option value="{{ r.nombre }}">{% endfor %}</datalist>
+  </fieldset>
+  <fieldset><legend>Sitio</legend>
+    <label>Nombre del sitio <input name="nombre" required maxlength="120" value="{{ sitio.nombre if sitio else '' }}"></label>
+    <label>Ciudad <input name="ciudad" maxlength="80" value="{{ (sitio.ciudad or '') if sitio else '' }}"></label>
+    <label class="ancho">Dirección (la ve el técnico para llegar) <input name="direccion" maxlength="200" value="{{ (sitio.direccion or '') if sitio else '' }}"></label>
+    <label>Latitud <input name="lat" inputmode="decimal" value="{{ (sitio.lat if sitio.lat is not none else '') if sitio else '' }}" placeholder="10.9878"></label>
+    <label>Longitud <input name="lon" inputmode="decimal" value="{{ (sitio.lon if sitio.lon is not none else '') if sitio else '' }}" placeholder="-74.7889"></label>
+    <label>Radio de llegada (m) <input name="radio" inputmode="numeric" value="{{ sitio.radio_checkin_m if sitio and sitio.radio_checkin_m else 200 }}"></label>
+    <p class="nota ancho">Con latitud y longitud, la app confirma que el técnico llegó al sitio. En Google Maps: clic derecho sobre el lugar → copiar las coordenadas.</p>
+  </fieldset>
+  <fieldset><legend>Técnicos que atienden el sitio</legend>
+    {% for tipo, texto in [('principal', 'Técnico principal (recibe los tickets)'), ('suplente', 'Suplente (si el principal no acepta a tiempo)')] %}
+    <label>{{ texto }}
+      <select name="{{ tipo }}"><option value="">— ninguno —</option>
+        {% set actual = (sitio[tipo ~ '_id']|string) if sitio and sitio[tipo ~ '_id'] else '' %}
+        {% for t in tecnicos %}<option value="{{ t.id }}" {{ 'selected' if actual == t.id|string }}>{{ t.nombre }}</option>{% endfor %}
+      </select></label>
+    {% endfor %}
+    {% if not tecnicos %}<p class="nota ancho">No hay técnicos activos: créelos en Administración → Nuevo usuario.</p>{% endif %}
+  </fieldset>
+  <div class="botones"><button type="submit">Guardar sitio</button><a class="boton sec" href="/portal/admin">Cancelar</a></div>
+</form>
+{% endblock %}

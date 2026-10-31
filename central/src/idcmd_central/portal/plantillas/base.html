@@ -20,7 +20,7 @@
 <aside class="menu">
   <a class="menu-marca" href="/portal">{% include "_marca.html" %}<span class="producto">Command</span></a>
   <nav class="principal">
-    {% for url, texto, nombre in [('/portal', 'Sitios', 'sitios'), ('/portal/tickets', 'Tickets', 'tickets'), ('/portal/servicios', 'Servicios', 'servicios'), ('/portal/informes', 'Informes', 'informes')] + ([('/portal/avisos', 'Avisos', 'avisos')] if usuario.rol == 'admin' else []) %}
+    {% for url, texto, nombre in [('/portal', 'Sitios', 'sitios'), ('/portal/tickets', 'Tickets', 'tickets'), ('/portal/servicios', 'Servicios', 'servicios'), ('/portal/informes', 'Informes', 'informes')] + ([('/portal/avisos', 'Avisos', 'avisos'), ('/portal/admin', 'Administración', 'admin')] if usuario.rol == 'admin' else []) %}
     {% set activa = (ruta == url) or (url != '/portal' and ruta.startswith(url)) or (url == '/portal' and ruta.startswith('/portal/sitios')) %}
     <a href="{{ url }}" class="{{ 'activa' if activa }}">{{ icono(nombre) }}<span>{{ texto }}</span></a>
     {% endfor %}

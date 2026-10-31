@@ -185,3 +185,33 @@ async def test_crear_usuario_que_ya_existe_no_muestra_clave(bd, dueno, datos, ca
                                        "sitio_a1", "--generar-clave"])  # fmt: skip
     assert "ya existe" in str(fin.value) and "no se cambió nada" in str(fin.value)
     assert "Clave nueva del portal" not in capsys.readouterr().out
+
+
+async def test_rendimiento_de_tecnicos_y_confiabilidad_de_equipos(bd, dueno, datos, tmp_path,
+                                                                   monkeypatch):  # fmt: skip
+    monkeypatch.setenv("IDCMD_COOKIE_SEGURA", "false")
+    await _preparar(tmp_path)
+    hoy = datetime.now(UTC)
+    rango = f"desde={hoy.year - (hoy.month <= 2)}-{(hoy.month - 3) % 12 + 1:02d}&hasta={hoy:%Y-%m}"
+    async with await _portal(bd, dueno, "admin@prueba.co") as c:
+        r = await c.get(f"/portal/servicios/tecnicos?{rango}")
+        assert r.status_code == 200 and "Técnico Demo" in r.text and "Retrabajos" in r.text
+        excel = (await c.get(f"/portal/servicios/tecnicos.csv?{rango}")).content
+        filas = excel.decode("utf-8-sig").strip().splitlines()
+        assert filas[0].startswith("Técnico;Servicios;Atendidos") and len(filas) >= 2
+        r = await c.get(f"/portal/servicios/equipos?{rango}&sitio={demo._id('sitio')}")
+        assert r.status_code == 200 and "Cámara 3 · parqueadero" in r.text
+        excel = await c.get(f"/portal/servicios/equipos.csv?{rango}&sitio={demo._id('sitio')}")
+        filas = excel.content.decode("utf-8-sig").strip().splitlines()
+        assert filas[0].startswith("Sitio;Equipo;Tipo;Disponibilidad")
+        camara = next(f.split(";") for f in filas if "Cámara 3" in f)
+        assert int(camara[4]) >= 1  # la cámara del parqueadero se cae en la demo
+    async with await _portal(bd, dueno, "demo@idtech.test") as c:
+        assert (await c.get(f"/portal/servicios/tecnicos?{rango}")).status_code == 404
+        r = await c.get(f"/portal/servicios/equipos?{rango}")
+        assert r.status_code == 200 and "Cámara 3 · parqueadero" in r.text
+        assert ">Técnicos<" not in r.text  # el cliente no ve la pestaña
+    async with await _portal(bd, dueno, "tecnico.demo@idtech.test") as c:
+        r = await c.get(f"/portal/servicios/tecnicos.csv?{rango}")
+        filas = r.content.decode("utf-8-sig").strip().splitlines()
+        assert [f.split(";")[0] for f in filas[1:]] == ["Técnico Demo"]  # solo su fila

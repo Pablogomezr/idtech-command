@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titulo %}Acceso de {{ nombre }} · IDtech Command{% endblock %}
+{% block contenido %}
+<div class="sub"><a href="/portal/admin">Administración</a> ›</div>
+<h1>{{ 'Usuario creado' if motivo == 'nuevo' else 'Acceso restablecido' }}: {{ nombre }}</h1>
+<div class="resumen resumen-atencion">Estos datos se muestran <b>una sola vez</b>. Entréguelos en persona o por llamada; no los envíe por correo ni WhatsApp.</div>
+<div class="credenciales">
+  <div class="tarjeta">
+    <h2 style="margin-top:0">1. Datos para ingresar</h2>
+    <dl class="metricas">
+      <dt>Portal</dt><dd>command.idtech.com.co</dd>
+      <dt>Correo</dt><dd><b>{{ correo }}</b></dd>
+      <dt>Clave</dt><dd><code class="clave">{{ clave }}</code></dd>
+    </dl>
+    <p class="nota">La clave lleva los guiones. Si lo prefiere, guárdela en un gestor de claves.</p>
+  </div>
+  <div class="tarjeta">
+    <h2 style="margin-top:0">2. Segundo factor</h2>
+    <p class="nota">En el celular de {{ nombre }}: Google o Microsoft Authenticator → "+" → <b>Escanear código QR</b>.</p>
+    <div class="qr">{{ qr|safe }}</div>
+    <p class="nota">Si no puede escanear: "Ingresar una clave de configuración", tipo <b>basada en tiempo</b>:</p>
+    <code class="clave">{{ secreto }}</code>
+  </div>
+</div>
+<div class="botones"><a class="boton" href="/portal/admin">Listo, volver a Administración</a></div>
+{% endblock %}

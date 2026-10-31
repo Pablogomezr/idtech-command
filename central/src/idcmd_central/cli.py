@@ -28,7 +28,6 @@ import argparse
 import getpass
 import os
 import re
-import secrets
 import sys
 import uuid
 from pathlib import Path
@@ -41,6 +40,7 @@ from . import laboratorio
 from .migrar import migrar
 from .portal.seguridad import (
     cifrar_secreto,
+    generar_clave,
     generar_llave,
     generar_secreto,
     llave_desde_entorno,
@@ -178,17 +178,10 @@ def restablecer_mfa(dsn: str, correo: str, clave: str | None = None) -> str:
 # Secuencias de teclas especiales (F1-F12, flechas...) que la terminal mete en lo escrito: el
 # navegador no las inserta en el campo de clave, así que aquí tampoco deben contar.
 _TECLAS_ESPECIALES = re.compile(r"\x1b(\[[0-9;?]*[ -/]*[@-~]|O.|.)|[\x00-\x1f\x7f]")
-# Sin caracteres que se confunden (0/O, 1/l/I) para que se pueda copiar o dictar sin errores.
-_ALFABETO_CLAVE = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
 def limpiar_clave(texto: str) -> str:
     return _TECLAS_ESPECIALES.sub("", texto)
-
-
-def generar_clave() -> str:
-    """Clave aleatoria de 4 grupos de 5 (~114 bits), p. ej. Kq7mX-p2t9V-dRhL4-w8Nc3."""
-    return "-".join("".join(secrets.choice(_ALFABETO_CLAVE) for _ in range(5)) for _ in range(4))
 
 
 def _pedir_clave() -> str:

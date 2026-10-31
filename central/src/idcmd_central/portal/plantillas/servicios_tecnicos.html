@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titulo %}Rendimiento de técnicos · IDtech Command{% endblock %}
+{% block contenido %}
+<h1>{{ 'Mi rendimiento' if usuario.rol == 'tecnico' else 'Rendimiento de los técnicos' }}</h1>
+<div class="sub">Rapidez y calidad del servicio: cuánto tardan en aceptar, en llegar y en reparar, si cumplen el SLA y si la falla vuelve.</div>
+{% include "_pestanas_servicios.html" %}
+{% set csv = '/portal/servicios/tecnicos.csv' %}{% include "_filtro_periodo.html" %}
+<div class="tabla"><table>
+  <thead><tr><th>Técnico</th><th class="n">Servicios</th><th class="n">Reparados</th><th class="n dos">En<br>curso</th>
+    <th class="n dos">Respuesta<br>media</th><th class="n dos">Llegada<br>media</th><th class="n dos">Solución<br>media</th>
+    <th class="n dos">Respuesta<br>a tiempo</th><th class="n dos">Solución<br>a tiempo</th><th class="n">Reaperturas</th>
+    <th class="n">Retrabajos</th><th class="n dos">A la<br>primera</th></tr></thead>
+  <tbody>{% for r in filas %}
+    <tr><td style="white-space:nowrap"><b>{{ r.tecnico }}</b></td><td class="n"><b>{{ r.servicios }}</b></td><td class="n">{{ r.reparados }}</td><td class="n">{{ r.en_curso }}</td>
+      <td class="n">{{ duracion(r.respuesta_s) if r.respuesta_s else '—' }}</td>
+      <td class="n">{{ duracion(r.llegada_s) if r.llegada_s else '—' }}</td>
+      <td class="n">{{ duracion(r.solucion_s) if r.solucion_s else '—' }}</td>
+      {% for v in (r.respuesta_pct, r.solucion_pct) %}<td class="n">{% if v is none %}—{% else %}<span class="pastilla {{ 'e-ok' if v >= 90 else ('e-degradado' if v >= 75 else 'e-caido') }}">{{ v|pct(0) }}</span>{% endif %}</td>{% endfor %}
+      <td class="n">{{ r.reaperturas or '—' }}</td><td class="n">{{ r.retrabajos or '—' }}</td>
+      <td class="n">{% if r.primera_pct is none %}—{% else %}<span class="pastilla {{ 'e-ok' if r.primera_pct >= 90 else ('e-degradado' if r.primera_pct >= 75 else 'e-caido') }}">{{ r.primera_pct|pct(0) }}</span>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="12" class="sub">No hubo servicios en el periodo.</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="tarjeta nota">
+  <b>Cómo leerlo.</b> <b>Respuesta</b>: de la falla a que el técnico acepta. <b>Llegada</b>: hasta que confirma en el sitio.
+  <b>Solución</b>: hasta que lo marca reparado. <b>Reapertura</b>: lo marcó resuelto pero el equipo siguió fallando.
+  <b>Retrabajo</b>: el equipo volvió a fallar con la misma falla dentro de {{ dias_retrabajo }} días después de cerrado.
+  <b>A la primera</b>: reparados sin reapertura ni retrabajo. Los que se recuperaron solos no cuentan en los porcentajes.
+</div>
+{% endblock %}
