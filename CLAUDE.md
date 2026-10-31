@@ -72,6 +72,8 @@ central/     FastAPI: ingesta + portal + worker (idcmd_central)
   src/idcmd_central/informes/    informe mensual de SLA: calculo.py (reglas ADR 0004, puras),
                                  informe.py (datos -> resumen), emitir.py (día 1, 6 a. m.), PDF
                                  (WeasyPrint), gráfico SVG; portal/informes.py (portal y enlace)
+  src/idcmd_central/portal/servicios.py  reporte de servicios por equipo/falla/técnico + CSV
+  src/idcmd_central/demo.py      cliente demo (equipos simulados, historial; nunca avisa: es_demo)
 docs/        adr/, runbooks/, plantillas/, supuestos.md
 despliegue/  laboratorio/ (compose + iniciar.ps1 para un PC), minipc/ (nftables),
              oci/ (Cloud Shell: red, servidor, IP, bucket), produccion/ (Caddy HTTPS, instalar.sh,
@@ -196,4 +198,5 @@ Dahua: **nunca** usar `configManager.cgi` (RemoteDevice devuelve las claves de l
 | E3 | Servicio parte 2: PWA del técnico (llegada con ubicación, pasos, fotos, firma, acta) | ✅ Entrega 6 (probado en celular emulado con GPS) |
 | E5 | Producción: central en OCI Bogotá con HTTPS, respaldos cifrados, agente de sitio | ✅ Entrega 7 (publicada en command.idtech.com.co) |
 | E4 | Informe mensual de SLA: disponibilidad ponderada, exclusiones, cumplimiento de tickets, tendencia, PDF, envío el día 1 | ✅ Entrega 8 (probado con Postgres real y PDF en el contenedor) |
+| E4 | Reporte de servicios (por equipo, falla, técnico; CSV) y cliente demo | ✅ Entrega 9 |
 | E3–E6 | Servicio parte 3 (acta PDF, encuesta, cotización de repuestos), piloto | Pendiente |

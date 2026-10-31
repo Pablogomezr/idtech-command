@@ -33,6 +33,8 @@ docker compose version
 paso "2/6 Secretos del servidor"
 mkdir -p "$BASE/sitios" "$BASE/respaldos"
 chmod 700 "$BASE"
+# La consola de la central corre como 10001 y deja aquí la configuración del agente demo.
+install -d -o 10001 -g 10001 -m 700 "$BASE/sitios/demo"
 if [[ ! -f "$ENTORNO" ]]; then
   read -r -p "Dominio del portal (p. ej. command.idtech.com.co): " DOMINIO
   read -r -p "Correo para los avisos de Let's Encrypt: " CORREO
@@ -102,6 +104,12 @@ install -m 755 "$REPO/despliegue/produccion/respaldar.sh" /usr/local/sbin/idcmd-
 printf '#!/bin/sh\nexec %s run --rm preparar idcmd-central "$@"\n' "${COMPOSE[*]}" \
   > /usr/local/sbin/idcmd-central
 chmod 755 /usr/local/sbin/idcmd-central
+printf '#!/bin/sh\nexec %s --profile demo up -d --build demo\n' "${COMPOSE[*]}" \
+  > /usr/local/sbin/idcmd-demo-iniciar
+chmod 755 /usr/local/sbin/idcmd-demo-iniciar
+if [[ -f "$BASE/sitios/demo/agente/agente.yaml" ]]; then
+  "${COMPOSE[@]}" --profile demo up -d --build demo   # al actualizar, la demo sigue viva
+fi
 install -m 644 "$REPO/despliegue/produccion/idcmd-respaldo.service" /etc/systemd/system/
 install -m 644 "$REPO/despliegue/produccion/idcmd-respaldo.timer" /etc/systemd/system/
 systemctl daemon-reload

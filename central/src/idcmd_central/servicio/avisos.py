@@ -105,10 +105,11 @@ async def generar(con: AsyncConnection, ahora: datetime) -> int:
     cur = await con.cursor(row_factory=dict_row).execute(
         """
         SELECT e.id, e.ticket_id, e.cliente_id, e.sitio_id, e.tipo, e.texto, e.usuario_id,
-               t.numero, t.titulo, s.nombre AS sitio, d.nombre AS equipo
+               t.numero, t.titulo, s.nombre AS sitio, d.nombre AS equipo, c.es_demo
           FROM idcmd.eventos_ticket e
           JOIN idcmd.tickets t ON t.id = e.ticket_id
           JOIN idcmd.sitios s ON s.id = e.sitio_id
+          JOIN idcmd.clientes c ON c.id = e.cliente_id
           LEFT JOIN idcmd.dispositivos d ON d.id = t.dispositivo_id
          WHERE e.id > %s ORDER BY e.id
         """,
@@ -117,6 +118,8 @@ async def generar(con: AsyncConnection, ahora: datetime) -> int:
     creados, ultimo = 0, desde
     for ev in await cur.fetchall():
         ultimo = ev["id"]
+        if ev["es_demo"]:
+            continue  # cliente de demostración: sus tickets nunca avisan a nadie
         vistos = set()
         for canal, destino, a_quien in await _destinatarios(con, ev):
             if (canal, destino) in vistos:

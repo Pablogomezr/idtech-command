@@ -96,7 +96,8 @@ async def emitir_mes(bd: BaseDatos, ahora: datetime) -> int:
         return 0
     async with bd.como_worker() as con:
         cur = await con.cursor(row_factory=dict_row).execute(
-            "SELECT s.id, s.cliente_id, s.nombre, c.informe_pdf_adjunto FROM idcmd.sitios s"
+            "SELECT s.id, s.cliente_id, s.nombre, c.informe_pdf_adjunto, c.es_demo"
+            " FROM idcmd.sitios s"
             " JOIN idcmd.clientes c ON c.id = s.cliente_id"
             " WHERE NOT EXISTS (SELECT 1 FROM idcmd.informes_mensuales i"
             "                    WHERE i.sitio_id = s.id AND i.periodo = %s)"
@@ -112,7 +113,11 @@ async def emitir_mes(bd: BaseDatos, ahora: datetime) -> int:
             async with bd.como_worker() as con:
                 r = await guardar(con, sitio["id"], periodo, ahora, recalcular=False)
                 # Sin nada medido ni servicios no se molesta al cliente (sitio sin agente aún).
-                if r and (r["totales"]["medidos"] or r["tickets"]["total"]):
+                if (
+                    r
+                    and not sitio["es_demo"]
+                    and (r["totales"]["medidos"] or r["tickets"]["total"])
+                ):
                     await _avisar(con, sitio, periodo, r, ahora)
             emitidos += 1
         except Exception:

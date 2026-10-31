@@ -15,6 +15,7 @@ from .ingesta.api import router as router_ingesta
 from .portal.campo import router as router_campo
 from .portal.informes import router as router_informes
 from .portal.rutas import router as router_portal
+from .portal.servicios import router as router_servicios
 
 # El portal no carga nada de terceros: htmx y la hoja de estilos se sirven desde aquí.
 CABECERAS_PORTAL = {
@@ -60,6 +61,7 @@ def crear_app(bd: BaseDatos | None = None) -> FastAPI:
     app.include_router(router_portal)
     app.include_router(router_campo)
     app.include_router(router_informes)
+    app.include_router(router_servicios)
     app.mount(
         "/portal/estaticos",
         StaticFiles(directory=Path(__file__).parent / "portal" / "estaticos"),

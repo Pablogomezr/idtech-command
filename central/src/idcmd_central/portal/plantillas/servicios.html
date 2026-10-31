@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block titulo %}Servicios · IDtech Command{% endblock %}
+{% block contenido %}
+<h1>Reporte de servicios</h1>
+<div class="sub">Cuántos servicios hubo, en qué equipos, de qué fallas, quién los atendió y si se cumplió el SLA.</div>
+
+<form class="tarjeta filtros" method="get" action="/portal/servicios">
+  <label>Desde <input type="month" name="desde" value="{{ filtro.desde }}"></label>
+  <label>Hasta <input type="month" name="hasta" value="{{ filtro.hasta }}"></label>
+  <label>Sitio
+    <select name="sitio"><option value="">Todos</option>
+      {% for s in sitios %}<option value="{{ s.id }}" {{ 'selected' if filtro.sitio == s.id|string }}>{{ s.nombre }}</option>{% endfor %}
+    </select></label>
+  <label>Agrupar por
+    <select name="por">{% for k, v in AGRUPACIONES.items() %}{% if k != 'tecnico' or usuario.rol != 'cliente' %}
+      <option value="{{ k }}" {{ 'selected' if filtro.por == k }}>{{ v }}</option>{% endif %}{% endfor %}
+    </select></label>
+  {% if es_tecnico %}<label class="casilla"><input type="checkbox" name="todos" value="1" {{ 'checked' if not mios }}> Ver también los de otros técnicos</label>{% endif %}
+  <button type="submit">Ver</button>
+  <a class="boton sec" href="/portal/servicios.csv?{{ consulta }}">Descargar Excel (CSV)</a>
+</form>
+
+<div class="rejilla kpis">
+  <div class="tarjeta"><div class="sub">Servicios</div><div class="grande">{{ tickets|length }}</div>
+    <div class="sub">{{ tickets|selectattr('estado', 'in', ['cerrado', 'cancelado'])|list|length }} cerrados</div></div>
+  <div class="tarjeta"><div class="sub">Respuesta a tiempo</div><div class="grande">{{ total.respuesta.porcentaje|pct(0) }}</div>
+    <div class="sub">media {{ duracion(total.respuesta_prom_s) if total.respuesta_prom_s else "—" }}</div></div>
+  <div class="tarjeta"><div class="sub">Solución a tiempo</div><div class="grande">{{ total.solucion.porcentaje|pct(0) }}</div>
+    <div class="sub">tiempo medio {{ duracion(total.mttr_s) if total.mttr_s else "—" }}</div></div>
+</div>
+
+<h2>Por {{ AGRUPACIONES[filtro.por]|lower }}</h2>
+<div class="tabla"><table>
+  <thead><tr><th>{{ AGRUPACIONES[filtro.por] }}</th><th class="n">Servicios</th><th class="n">Reparados</th><th class="n">Se recuperaron solos</th>
+    <th class="n">En curso</th><th class="n">Respuesta a tiempo</th><th class="n">Solución a tiempo</th><th class="n">Tiempo medio de solución</th></tr></thead>
+  <tbody>{% for g in grupos %}
+    <tr><td>{{ g.nombre }}</td><td class="n"><strong>{{ g.total }}</strong></td><td class="n">{{ g.verificados }}</td><td class="n">{{ g.solos }}</td>
+      <td class="n">{{ g.abiertos }}</td><td class="n">{{ g.respuesta_pct|pct(0) }}</td><td class="n">{{ g.solucion_pct|pct(0) }}</td>
+      <td class="n">{{ duracion(g.mttr_s) if g.mttr_s else "—" }}</td></tr>
+  {% else %}<tr><td colspan="8" class="sub">No hubo servicios en el periodo.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+{% if tickets %}
+<h2>Detalle{% if tickets|length > MAX_LISTA %} (primeros {{ MAX_LISTA }}; el Excel trae todos){% endif %}</h2>
+<div class="tabla"><table>
+  <thead><tr><th>#</th><th>Abierto</th><th>Sitio · equipo</th><th>Falla</th><th>Prioridad</th><th>Estado</th>{% if usuario.rol != 'cliente' %}<th>Técnico</th>{% endif %}</tr></thead>
+  <tbody>{% for t in tickets[:MAX_LISTA] %}
+    <tr><td>{{ t.numero }}</td><td>{{ t.abierto_at|hora("%d/%m %H:%M") }}</td><td>{{ t.sitio }}{% if t.equipo %} · {{ t.equipo }}{% endif %}</td>
+      <td>{{ t.codigo|codigo }}</td><td>{{ PRIORIDADES[t.prioridad] }}</td>
+      <td>{{ CIERRES.get(t.cierre) if t.cierre else ESTADOS_TICKET.get(t.estado, t.estado) }}</td>
+      {% if usuario.rol != 'cliente' %}<td>{{ t.tecnico or "—" }}</td>{% endif %}</tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endblock %}

@@ -93,8 +93,24 @@ services:
       - caddy_config:/config
     depends_on: [central]
 
+  # Equipos SIMULADOS del cliente demo (idcmd-central demo preparar). Comparte la red de la
+  # central: le habla por http://localhost:8000 sin salir del servidor.
+  demo:
+    <<: *endurecido
+    image: idcmd-agente:demo
+    build: ../../agente
+    profiles: [demo]
+    network_mode: "service:central"
+    command: ["ejecutar"]
+    volumes:
+      - /srv/idcmd/sitios/demo/agente:/config:ro
+      - /srv/idcmd/sitios/demo/secretos:/secretos:ro
+      - demo_datos:/datos
+    depends_on: [central]
+
 volumes:
   bd:
   archivos:
+  demo_datos:
   caddy_datos:
   caddy_config:

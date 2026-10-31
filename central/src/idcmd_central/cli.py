@@ -23,6 +23,8 @@ from __future__ import annotations
 import argparse
 import getpass
 import os
+import re
+import secrets
 import sys
 import uuid
 from pathlib import Path
@@ -169,13 +171,40 @@ def restablecer_mfa(dsn: str, correo: str, clave: str | None = None) -> str:
     return secreto
 
 
+# Secuencias de teclas especiales (F1-F12, flechas...) que la terminal mete en lo escrito: el
+# navegador no las inserta en el campo de clave, así que aquí tampoco deben contar.
+_TECLAS_ESPECIALES = re.compile(r"\x1b(\[[0-9;?]*[ -/]*[@-~]|O.|.)|[\x00-\x1f\x7f]")
+# Sin caracteres que se confunden (0/O, 1/l/I) para que se pueda copiar o dictar sin errores.
+_ALFABETO_CLAVE = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def limpiar_clave(texto: str) -> str:
+    return _TECLAS_ESPECIALES.sub("", texto)
+
+
+def generar_clave() -> str:
+    """Clave aleatoria de 4 grupos de 5 (~114 bits), p. ej. Kq7mX-p2t9V-dRhL4-w8Nc3."""
+    return "-".join("".join(secrets.choice(_ALFABETO_CLAVE) for _ in range(5)) for _ in range(4))
+
+
 def _pedir_clave() -> str:
-    clave = getpass.getpass("Clave del portal (mínimo 12 caracteres): ")
+    clave = limpiar_clave(getpass.getpass("Clave del portal (mínimo 12 caracteres): "))
     if len(clave) < LONGITUD_MINIMA_CLAVE:
         sys.exit("la clave debe tener al menos 12 caracteres")
-    if getpass.getpass("Repita la clave: ") != clave:
-        sys.exit("las claves no coinciden")
+    if limpiar_clave(getpass.getpass("Repita la clave: ")) != clave:
+        sys.exit(
+            "las claves no coinciden. Si su teclado mete teclas especiales, use --generar-clave"
+        )
     return clave
+
+
+def _clave_de(args) -> str:
+    if getattr(args, "generar_clave", False):
+        clave = generar_clave()
+        print(f"Clave nueva del portal: {clave}")
+        print("Cópiela YA a su gestor de claves: no se vuelve a mostrar.")
+        return clave
+    return _pedir_clave()
 
 
 def _mostrar_segundo_factor(correo: str, secreto: str) -> None:
@@ -183,13 +212,13 @@ def _mostrar_segundo_factor(correo: str, secreto: str) -> None:
     print("Segundo factor: en Google o Microsoft Authenticator, 'Agregar cuenta' ->")
     print("'Ingresar una clave de configuración' (o escanee la URI):")
     print(f"  cuenta: {correo}")
-    print(f"  clave:  {secreto}")
+    print(f"  clave:  {' '.join(secreto[i : i + 4] for i in range(0, len(secreto), 4))}")
     print(f"  URI:    {uri_totp(secreto, correo)}")
     print("Esta clave se muestra UNA sola vez. Agréguela al celular antes de cerrar esta ventana.")
 
 
 def cmd_usuarios_restablecer_mfa(args) -> int:
-    clave = _pedir_clave() if args.nueva_clave else None
+    clave = _clave_de(args) if args.nueva_clave or args.generar_clave else None
     try:
         secreto = restablecer_mfa(_dsn_admin(), args.correo, clave)
     except LookupError as e:
@@ -200,7 +229,7 @@ def cmd_usuarios_restablecer_mfa(args) -> int:
 
 
 def cmd_usuarios_crear(args) -> int:
-    clave = _pedir_clave()
+    clave = _clave_de(args)
     try:
         usuario_id, secreto = crear_usuario(_dsn_admin(), args.correo, args.nombre, args.rol, clave)
     except psycopg.errors.UniqueViolation:
@@ -437,6 +466,61 @@ def cmd_informe_pdf(args) -> int:
     return _informe(args, accion)
 
 
+def cmd_demo_preparar(args) -> int:
+    import asyncio
+    from datetime import UTC, datetime
+
+    from . import demo
+    from .informes import informe as inf
+    from .informes.emitir import guardar
+
+    dsn = _dsn_admin()
+    ahora = datetime.now(UTC)
+
+    def crear(correo, nombre, rol):
+        clave = generar_clave()
+        usuario_id, secreto = crear_usuario(dsn, correo, nombre, rol, clave)
+        return usuario_id, (clave, secreto)
+
+    try:
+        r, credenciales = demo.preparar(
+            dsn, args.correo, args.correo_tecnico, args.salida, args.url_central, crear, ahora
+        )
+    except ValueError as e:
+        sys.exit(str(e))
+    print(f"cliente demo listo: sitio '{demo.SITIO}' ({r.sitio_id}), agente {r.agente_id}")
+    if r.historial_desde:
+        actual = inf.periodo_de(f"{ahora.astimezone(inf.ZONA):%Y-%m}")
+        periodos, p = [], r.historial_desde
+        while p < actual:
+            periodos.append(p)
+            p = inf.mes_anterior(p, -1)
+
+        async def emitir():
+            async with await psycopg.AsyncConnection.connect(dsn, autocommit=True) as con:
+                for p in periodos:
+                    async with con.transaction():
+                        await guardar(con, r.sitio_id, p, ahora, recalcular=True)
+
+        asyncio.run(emitir())
+        print(f"historial simulado desde {r.historial_desde:%Y-%m}; informes emitidos: "
+              + (", ".join(f"{p:%Y-%m}" for p in periodos) or "ninguno"))  # fmt: skip
+    for quien, correo in (("cliente", args.correo), ("tecnico", args.correo_tecnico)):
+        cred = credenciales[quien]
+        if cred is None:
+            print(
+                f"\nusuario {quien} {correo}: ya existía"
+                " (si hace falta: usuarios restablecer-mfa --generar-clave)"
+            )
+            continue
+        print(f"\n=== Usuario {quien} de la demo ===")
+        print(f"  correo: {correo}")
+        print(f"  clave del portal: {cred[0]}")
+        _mostrar_segundo_factor(correo, cred[1])
+    print("\nPara que los equipos simulados funcionen en vivo: sudo idcmd-demo-iniciar")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="idcmd-central")
     sub = p.add_subparsers(dest="comando", required=True)
@@ -455,10 +539,18 @@ def main(argv: list[str] | None = None) -> int:
     u_crear.add_argument("--correo", required=True)
     u_crear.add_argument("--nombre", required=True)
     u_crear.add_argument("--rol", choices=["admin", "tecnico", "cliente"], required=True)
+    u_crear.add_argument(
+        "--generar-clave", action="store_true", help="clave aleatoria, sin teclear"
+    )
     u_crear.set_defaults(fn=cmd_usuarios_crear)
     u_mfa = usuarios.add_parser("restablecer-mfa", help="nuevo segundo factor para un usuario")
     u_mfa.add_argument("--correo", required=True)
     u_mfa.add_argument("--nueva-clave", action="store_true", help="cambiar también la clave")
+    u_mfa.add_argument(
+        "--generar-clave",
+        action="store_true",
+        help="cambiar la clave por una aleatoria (sin teclear)",
+    )
     u_mfa.set_defaults(fn=cmd_usuarios_restablecer_mfa)
     u_tg = usuarios.add_parser("telegram", help="vincular el chat de Telegram de un usuario")
     u_tg.add_argument("--correo", required=True)
@@ -510,6 +602,15 @@ def main(argv: list[str] | None = None) -> int:
     i_pdf.add_argument("--mes", required=True)
     i_pdf.add_argument("--salida", type=Path, required=True)
     i_pdf.set_defaults(fn=cmd_informe_pdf)
+    demo_p = sub.add_parser("demo", help="cliente de demostración").add_subparsers(
+        dest="accion", required=True
+    )
+    d_prep = demo_p.add_parser("preparar", help="crear o completar el cliente demo")
+    d_prep.add_argument("--correo", required=True, help="usuario cliente de la demo")
+    d_prep.add_argument("--correo-tecnico", required=True, help="técnico de la demo")
+    d_prep.add_argument("--salida", type=Path, default=Path("/sitios/demo"))
+    d_prep.add_argument("--url-central", default="http://localhost:8000")
+    d_prep.set_defaults(fn=cmd_demo_preparar)
     lab = sub.add_parser("laboratorio").add_subparsers(dest="accion", required=True)
     preparar = lab.add_parser("preparar")
     preparar.add_argument("--inventario", type=Path, required=True)
