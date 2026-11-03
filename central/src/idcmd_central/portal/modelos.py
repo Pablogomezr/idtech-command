@@ -109,6 +109,12 @@ async def _referencias(con) -> list[dict]:
              "foto": fotos.get(clave) if clave else None},
         )  # fmt: skip
         g["equipos"] += 1
+    # Fotos subidas antes de conectar esos equipos: se ven aquí para poder cambiarlas o quitarlas.
+    con_equipos = {g["modelo"] for g in grupos.values()}
+    for modelo, foto in fotos.items():
+        if modelo not in con_equipos:
+            grupos[(modelo, "")] = {"modelo": modelo, "tipo": "", "marca": None, "equipos": 0,
+                                    "forma": "otro", "foto": foto}  # fmt: skip
     return sorted(
         grupos.values(), key=lambda g: (g["modelo"] is None, g["tipo"], g["modelo"] or "")
     )

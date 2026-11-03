@@ -152,3 +152,14 @@ async def test_la_base_no_deja_escribir_fotos_a_quien_no_es_admin(bd, datos):
                 "INSERT INTO idcmd.fotos_modelo (modelo, mime, contenido, sha256)"
                 " VALUES ('X', 'image/webp', '\\x00', '\\x00')"
             )
+
+
+async def test_foto_de_una_referencia_que_aun_no_esta_en_el_inventario(portal, dueno):
+    async with portal("u_admin") as c:
+        r = await c.post("/portal/admin/apariencia/foto", headers=ORIGEN,
+                         data={"modelo": "DH-IPC-HFW1431S1-A-S4"},
+                         files={"archivo": ("bala.png", _foto("PNG"), "image/png")})  # fmt: skip
+        assert r.status_code == 303
+        lista = await c.get("/portal/admin/apariencia")
+        assert "DH-IPC-HFW1431S1-A-S4" in lista.text and "Aún sin equipos" in lista.text
+        assert "Quitar foto" in lista.text

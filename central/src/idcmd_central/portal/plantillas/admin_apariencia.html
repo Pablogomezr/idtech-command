@@ -12,13 +12,19 @@
   personas ni placas. Sirve la de la ficha técnica del distribuidor o una tomada por el técnico. El portal la reduce y le
   quita los datos ocultos (ubicación, autor) antes de guardarla.
 </div>
+<form class="tarjeta formulario subir-foto" method="post" action="/portal/admin/apariencia/foto" enctype="multipart/form-data">
+  <b>Foto para otra referencia</b> <span class="sub" style="margin:0">(aunque esos equipos aún no estén conectados)</span>
+  <input name="modelo" required maxlength="80" placeholder="Referencia, p. ej. DH-IPC-HFW1431S1-A-S4" aria-label="Referencia del modelo">
+  <input type="file" name="archivo" accept="image/jpeg,image/png,image/webp" required aria-label="Foto">
+  <button type="submit">Subir foto</button>
+</form>
 <div class="tabla"><table class="apariencia">
   <thead><tr><th>Así se ve</th><th>Referencia</th><th>Tipo</th><th class="n">Equipos</th><th>Foto del modelo</th></tr></thead>
   <tbody>{% for r in referencias %}
     <tr><td>{{ figura(r.forma, 'ok', ('/portal/modelos/foto/' ~ r.foto.huella) if r.foto else none, FORMAS[r.forma]) }}</td>
       <td>{% if r.modelo %}<b>{{ r.modelo }}</b>{% else %}<span class="sub" style="margin:0">Sin referencia en el inventario</span>{% endif %}
         {% if r.marca %}<div class="sub" style="margin:0">{{ r.marca|capitalize }}</div>{% endif %}</td>
-      <td>{{ FORMAS[r.forma] }}</td>
+      <td>{{ FORMAS[r.forma] if r.equipos else 'Aún sin equipos en el inventario' }}</td>
       <td class="n">{{ r.equipos }}</td>
       <td>{% if r.modelo %}
         <form class="subir-foto" method="post" action="/portal/admin/apariencia/foto" enctype="multipart/form-data">
